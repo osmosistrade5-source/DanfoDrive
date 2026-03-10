@@ -123,10 +123,10 @@ const AdPlayer = ({ onBack }: { onBack: () => void }) => {
             </div>
             <div className="text-center">
               <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2">Status</p>
-              <p className="text-xl font-black text-yellow-400 flex items-center gap-2">
+              <div className="text-xl font-black text-yellow-400 flex items-center gap-2">
                 <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse" />
                 Live
-              </p>
+              </div>
             </div>
           </div>
         </div>

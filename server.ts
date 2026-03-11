@@ -3,7 +3,14 @@ import { createServer as createViteServer } from "vite";
 import Database from "better-sqlite3";
 import path from "path";
 
-const db = new Database("danfodrive.db");
+let db: Database.Database;
+try {
+  db = new Database(":memory:");
+  console.log('[DB] Database initialized in-memory');
+} catch (err) {
+  console.error('[DB] Failed to initialize database:', err);
+  process.exit(1);
+}
 
 // Initialize Database
 db.exec(`
@@ -118,10 +125,17 @@ if (userCount.count === 0) {
     .run(1, 1, 6.5244, 3.3792, 12);
 }
 
+import fs from "fs";
+
 async function startServer() {
   const app = express();
   app.use(express.json());
   const PORT = 3000;
+
+  // Root health check
+  app.get("/healthz", (req, res) => {
+    res.send("OK");
+  });
 
   // API Routes
   app.get("/api/campaigns", (req, res) => {
@@ -191,6 +205,11 @@ async function startServer() {
     res.json({ success: true });
   });
 
+  app.get("/api/devices", (req, res) => {
+    const devices = db.prepare("SELECT * FROM devices").all();
+    res.json(devices);
+  });
+
   app.get("/api/ads/active", (req, res) => {
     const { lat, lng } = req.query;
     const ads = db.prepare(`
@@ -212,13 +231,78 @@ async function startServer() {
     res.json(filteredAds);
   });
 
+  // Admin Dashboard Stats
+  app.get("/api/admin/stats", (req, res) => {
+    const stats = {
+      totalScreens: db.prepare("SELECT COUNT(*) as count FROM devices").get() as any,
+      onlineDevices: db.prepare("SELECT COUNT(*) as count FROM devices WHERE status = 'online'").get() as any,
+      offlineDevices: db.prepare("SELECT COUNT(*) as count FROM devices WHERE status = 'offline'").get() as any,
+      monthlyRevenue: 1250000, // Mock revenue
+    };
+    res.json({
+      totalScreens: stats.totalScreens.count,
+      onlineDevices: stats.onlineDevices.count,
+      offlineDevices: stats.offlineDevices.count,
+      monthlyRevenue: stats.monthlyRevenue
+    });
+  });
+
+  // IoT Device Monitor
+  app.get("/api/admin/devices", (req, res) => {
+    const devices = db.prepare(`
+      SELECT d.*, u.name as driver_name 
+      FROM devices d 
+      LEFT JOIN users u ON d.driver_id = u.id
+    `).all();
+    res.json(devices);
+  });
+
+  // Payout Management
+  app.get("/api/admin/payouts/eligible", (req, res) => {
+    const eligible = db.prepare(`
+      SELECT u.id, u.name, u.balance, u.bank_name, u.account_number
+      FROM users u
+      WHERE u.role = 'driver' AND u.balance >= 20000
+    `).all();
+    res.json(eligible);
+  });
+
+  // Ad Approval Queue
+  app.get("/api/admin/ads/pending", (req, res) => {
+    const ads = db.prepare(`
+      SELECT a.*, c.name as campaign_name, u.name as advertiser_name
+      FROM ads a
+      JOIN campaigns c ON a.campaign_id = c.id
+      JOIN users u ON c.advertiser_id = u.id
+      WHERE a.approval_status = 'pending'
+    `).all();
+    res.json(ads);
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
+    try {
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "custom", // Use custom to handle index.html manually
+      });
+      app.use(vite.middlewares);
+      
+      app.get("*", async (req, res, next) => {
+        const url = req.originalUrl;
+        try {
+          let template = fs.readFileSync(path.resolve("index.html"), "utf-8");
+          template = await vite.transformIndexHtml(url, template);
+          res.status(200).set({ "Content-Type": "text/html" }).end(template);
+        } catch (e: any) {
+          vite.ssrFixStacktrace(e);
+          next(e);
+        }
+      });
+      console.log('[VITE] Vite middleware integrated with custom SPA fallback');
+    } catch (err) {
+      console.error('[VITE] Failed to create Vite server:', err);
+    }
   } else {
     app.use(express.static("dist"));
     app.get("*", (req, res) => {
@@ -227,8 +311,12 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`[SERVER] DanfoDrive Backend listening on http://0.0.0.0:${PORT}`);
+    console.log(`[SERVER] Environment: ${process.env.NODE_ENV || 'development'}`);
   });
 }
 
-startServer();
+console.log('[SERVER] Starting DanfoDrive Application...');
+startServer().catch(err => {
+  console.error('[SERVER] Fatal error during startup:', err);
+});

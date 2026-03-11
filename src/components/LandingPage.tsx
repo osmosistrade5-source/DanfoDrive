@@ -1,10 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { ChevronRight, Play, Shield, Zap, MapPin, TrendingUp } from 'lucide-react';
 
 export const LandingPage = ({ onGetStarted }: { onGetStarted: (role: string) => void }) => {
   const [budget, setBudget] = useState(50000);
   const reach = budget; // 1 Naira = 1 Impression as per PRD example
+
+  const [onlineCount, setOnlineCount] = useState(52);
+
+  useEffect(() => {
+    fetch('/api/devices')
+      .then(res => res.json())
+      .then(data => {
+        const online = data.filter((d: any) => d.status === 'online').length;
+        setOnlineCount(online > 0 ? online : 52); // Fallback to 52 for demo if none online
+      })
+      .catch(() => setOnlineCount(52));
+  }, []);
 
   return (
     <div className="bg-black min-h-screen text-white selection:bg-yellow-400 selection:text-black">
@@ -72,6 +84,29 @@ export const LandingPage = ({ onGetStarted }: { onGetStarted: (role: string) => 
             className="w-full h-full object-cover grayscale"
             referrerPolicy="no-referrer"
           />
+        </div>
+      </section>
+
+      {/* How it Works */}
+      <section id="how-it-works" className="py-24 px-6 border-t border-zinc-900">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-black tracking-tight mb-4">How it Works</h2>
+            <p className="text-zinc-500 max-w-2xl mx-auto">Connecting the dots between Lagos traffic and digital advertising.</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+            {[
+              { step: '01', title: 'Upload Creative', desc: 'Upload your video or image ad to our dashboard and set your target geofences.' },
+              { step: '02', title: 'GPS Triggered', desc: 'Our smart screens detect when a vehicle enters your target area and plays your ad.' },
+              { step: '03', title: 'Real-time ROI', desc: 'Track every impression with proof-of-play logs and GPS coordinates in real-time.' }
+            ].map((item, i) => (
+              <div key={i} className="relative p-8 bg-zinc-900/50 border border-zinc-800 rounded-3xl">
+                <span className="text-6xl font-black text-yellow-400/10 absolute top-4 right-8">{item.step}</span>
+                <h3 className="text-xl font-bold mb-4">{item.title}</h3>
+                <p className="text-zinc-500 leading-relaxed">{item.desc}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -144,30 +179,36 @@ export const LandingPage = ({ onGetStarted }: { onGetStarted: (role: string) => 
         </div>
       </section>
 
-      {/* Live Fleet Map Placeholder */}
+      {/* Live Fleet Activity */}
       <section className="py-24 px-6">
         <div className="max-w-7xl mx-auto text-center mb-16">
           <h2 className="text-4xl font-black tracking-tight mb-4">Live Fleet Activity</h2>
           <p className="text-zinc-500">Real-time visualization of active screens across Lagos.</p>
         </div>
-        <div className="max-w-5xl mx-auto aspect-[16/9] bg-zinc-900 rounded-3xl border border-zinc-800 overflow-hidden relative">
-          {/* Simulated Map */}
-          <div className="absolute inset-0 opacity-40 grayscale">
-             <img src="https://picsum.photos/seed/lagos-map/1200/800" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+        <div className="max-w-5xl mx-auto aspect-[16/9] bg-zinc-900 rounded-[3rem] border-[12px] border-zinc-800 overflow-hidden relative shadow-2xl shadow-yellow-400/5">
+          {/* Thematic Background - Danfo and BRT on Lagos road */}
+          <div className="absolute inset-0">
+             <img 
+               src="https://picsum.photos/seed/danfo-drive-lagos/1200/800" 
+               className="w-full h-full object-cover" 
+               referrerPolicy="no-referrer" 
+               alt="Danfo and BRT on Lagos road"
+             />
+             <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
           </div>
           
-          {/* Pulsing Dots */}
-          {[...Array(15)].map((_, i) => (
+          {/* Pulsing Dots representing active vehicles */}
+          {[...Array(onlineCount > 20 ? 20 : onlineCount)].map((_, i) => (
             <motion.div
               key={i}
-              className="absolute w-3 h-3 bg-yellow-400 rounded-full"
+              className="absolute w-4 h-4 bg-yellow-400 rounded-full"
               style={{
                 top: `${20 + Math.random() * 60}%`,
                 left: `${20 + Math.random() * 60}%`,
               }}
               animate={{
-                scale: [1, 1.5, 1],
-                opacity: [0.5, 1, 0.5],
+                scale: [1, 1.4, 1],
+                opacity: [0.6, 1, 0.6],
               }}
               transition={{
                 duration: 2 + Math.random() * 2,
@@ -178,16 +219,32 @@ export const LandingPage = ({ onGetStarted }: { onGetStarted: (role: string) => 
               <div className="absolute inset-0 bg-yellow-400 rounded-full animate-ping opacity-75" />
             </motion.div>
           ))}
-
-          <div className="absolute bottom-8 left-8 bg-black/80 backdrop-blur-md p-4 rounded-2xl border border-white/10 flex items-center gap-4">
-            <div className="flex -space-x-2">
+          
+          {/* Floating Status Card */}
+          <div className="absolute bottom-12 left-12 bg-black/80 backdrop-blur-xl p-6 rounded-[2rem] border border-white/10 flex items-center gap-6 shadow-2xl">
+            <div className="flex -space-x-3">
               {[...Array(3)].map((_, i) => (
-                <div key={i} className="w-8 h-8 rounded-full border-2 border-black bg-zinc-800 flex items-center justify-center overflow-hidden">
-                  <img src={`https://i.pravatar.cc/100?u=${i}`} referrerPolicy="no-referrer" />
+                <div key={i} className="w-12 h-12 rounded-full border-4 border-black bg-zinc-800 flex items-center justify-center overflow-hidden">
+                  <img src={`https://i.pravatar.cc/150?u=${i + 10}`} referrerPolicy="no-referrer" alt="Driver" />
                 </div>
               ))}
+              <div className="w-12 h-12 rounded-full border-4 border-black bg-yellow-400 flex items-center justify-center text-black font-black text-xs">
+                +{onlineCount > 3 ? onlineCount - 3 : 0}
+              </div>
             </div>
-            <p className="text-sm font-bold">52 Drivers Online in Lagos</p>
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse" />
+                <p className="text-xl font-black tracking-tight">{onlineCount} Drivers Online</p>
+              </div>
+              <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Active in Lagos State</p>
+            </div>
+          </div>
+
+          {/* Location Badge */}
+          <div className="absolute top-12 right-12 bg-yellow-400 text-black px-6 py-3 rounded-full font-black text-sm flex items-center gap-2 shadow-xl">
+            <MapPin size={16} />
+            LIVE: IKEJA / LEKKI / VI
           </div>
         </div>
       </section>

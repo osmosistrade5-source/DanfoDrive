@@ -3,8 +3,9 @@ import { motion, AnimatePresence } from 'motion/react';
 import { LandingPage } from './components/LandingPage';
 import { AdvertiserDashboard } from './components/AdvertiserDashboard';
 import { DriverPortal } from './components/DriverPortal';
-import { AdminPanel } from './components/AdminPanel';
+import { AdminDashboard } from './components/AdminDashboard';
 import { QrCode, Activity, MapPin, ChevronLeft } from 'lucide-react';
+import { Routes, Route, useNavigate, Navigate, useLocation } from 'react-router-dom';
 
 // --- Types ---
 interface Campaign {
@@ -28,6 +29,14 @@ interface Device {
   last_lat: number;
   last_lng: number;
 }
+
+// --- Protected Route Wrapper ---
+const ProtectedRoute = ({ children, role, userRole }: { children: React.ReactNode, role: string, userRole: string }) => {
+  if (userRole !== role) {
+    return <Navigate to="/" replace />;
+  }
+  return <>{children}</>;
+};
 
 // --- Ad Player Component (The "IoT" View) ---
 const AdPlayer = ({ onBack }: { onBack: () => void }) => {
@@ -138,55 +147,79 @@ const AdPlayer = ({ onBack }: { onBack: () => void }) => {
 // --- Main App ---
 
 export default function App() {
-  const [view, setView] = useState<'landing' | 'advertiser' | 'driver' | 'admin' | 'player'>('landing');
+  const [userRole, setUserRole] = useState<'guest' | 'advertiser' | 'driver' | 'admin'>('guest');
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Simple demo logic: set role based on path or button click
+  const handleRoleChange = (role: any) => {
+    setUserRole(role);
+    if (role === 'admin') navigate('/admin');
+    else if (role === 'advertiser') navigate('/advertiser');
+    else if (role === 'driver') navigate('/driver');
+    else navigate('/');
+  };
 
   return (
     <div className="min-h-screen bg-black">
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={view}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.3 }}
-        >
-          {view === 'landing' && <LandingPage onGetStarted={(role) => setView(role as any)} />}
-          {view === 'advertiser' && <AdvertiserDashboard />}
-          {view === 'driver' && <DriverPortal />}
-          {view === 'admin' && <AdminPanel />}
-          {view === 'player' && <AdPlayer onBack={() => setView('landing')} />}
-        </motion.div>
-      </AnimatePresence>
+      <Routes>
+        <Route path="/" element={<LandingPage onGetStarted={(role) => handleRoleChange(role)} />} />
+        <Route 
+          path="/advertiser" 
+          element={
+            <ProtectedRoute role="advertiser" userRole={userRole}>
+              <AdvertiserDashboard />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/driver" 
+          element={
+            <ProtectedRoute role="driver" userRole={userRole}>
+              <DriverPortal />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/admin" 
+          element={
+            <ProtectedRoute role="admin" userRole={userRole}>
+              <AdminDashboard />
+            </ProtectedRoute>
+          } 
+        />
+        <Route path="/player" element={<AdPlayer onBack={() => navigate('/')} />} />
+      </Routes>
 
       {/* Demo Role Switcher (Floating) */}
       <div className="fixed bottom-8 right-8 z-[200] flex gap-2 p-2 bg-zinc-900/80 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl">
         <button 
-          onClick={() => setView('landing')}
-          className={`p-2 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-colors ${view === 'landing' ? 'bg-yellow-400 text-black' : 'text-zinc-500 hover:text-white'}`}
+          onClick={() => handleRoleChange('guest')}
+          className={`p-2 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-colors ${location.pathname === '/' ? 'bg-yellow-400 text-black' : 'text-zinc-500 hover:text-white'}`}
         >
           Home
         </button>
         <button 
-          onClick={() => setView('advertiser')}
-          className={`p-2 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-colors ${view === 'advertiser' ? 'bg-yellow-400 text-black' : 'text-zinc-500 hover:text-white'}`}
+          onClick={() => handleRoleChange('advertiser')}
+          className={`p-2 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-colors ${location.pathname === '/advertiser' ? 'bg-yellow-400 text-black' : 'text-zinc-500 hover:text-white'}`}
         >
           Ads
         </button>
         <button 
-          onClick={() => setView('driver')}
-          className={`p-2 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-colors ${view === 'driver' ? 'bg-yellow-400 text-black' : 'text-zinc-500 hover:text-white'}`}
+          onClick={() => handleRoleChange('driver')}
+          className={`p-2 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-colors ${location.pathname === '/driver' ? 'bg-yellow-400 text-black' : 'text-zinc-500 hover:text-white'}`}
         >
           Driver
         </button>
         <button 
-          onClick={() => setView('admin')}
-          className={`p-2 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-colors ${view === 'admin' ? 'bg-yellow-400 text-black' : 'text-zinc-500 hover:text-white'}`}
+          onClick={() => handleRoleChange('admin')}
+          className={`p-2 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-colors ${location.pathname === '/admin' ? 'bg-yellow-400 text-black' : 'text-zinc-500 hover:text-white'}`}
         >
           Admin
         </button>
         <button 
-          onClick={() => setView('player')}
-          className={`p-2 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-colors ${view === 'player' ? 'bg-yellow-400 text-black' : 'text-zinc-500 hover:text-white'}`}
+          onClick={() => navigate('/player')}
+          className={`p-2 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-colors ${location.pathname === '/player' ? 'bg-yellow-400 text-black' : 'text-zinc-500 hover:text-white'}`}
         >
           Player
         </button>

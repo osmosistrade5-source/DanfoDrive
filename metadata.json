@@ -1,7 +1,5 @@
 {
   "name": "DanfoDrive",
   "description": "Programmatic Transit Ad-Network connecting advertisers to commercial vehicle drivers in Nigeria.",
-  "requestFramePermissions": [
-    "geolocation"
-  ]
+  "requestFramePermissions": []
 }

@@ -90,7 +90,7 @@ db.exec(`
 
 // Migration: Ensure columns exist (in case DB was created with older schema)
 try { db.exec("ALTER TABLE users ADD COLUMN balance REAL DEFAULT 0"); } catch (e) {}
-try { db.exec("ALTER TABLE campaigns ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP"); } catch (e) {}
+try { db.exec("ALTER TABLE campaigns ADD COLUMN created_at DATETIME DEFAULT '2026-01-01 00:00:00'"); } catch (e) {}
 try { db.exec("ALTER TABLE ads ADD COLUMN approval_status TEXT DEFAULT 'pending'"); } catch (e) {}
 
 // Seed some data if empty

@@ -40,7 +40,7 @@ export const LandingPage = ({ onGetStarted }: { onGetStarted: (role: string) => 
             <span className="inline-block px-4 py-1.5 bg-yellow-400/10 text-yellow-400 rounded-full text-xs font-bold tracking-widest uppercase mb-6 border border-yellow-400/20">
               Programmatic Transit OOH
             </span>
-            <h1 className="text-6xl md:text-8xl font-black tracking-tighter leading-[0.9] mb-8">
+            <h1 className="text-5xl sm:text-6xl md:text-8xl font-black tracking-tighter leading-[0.9] mb-8 pr-10">
               THE HEARTBEAT OF <span className="text-yellow-400">LAGOS</span> ADVERTISING.
             </h1>
             <p className="text-xl text-zinc-400 mb-10 leading-relaxed max-w-2xl">

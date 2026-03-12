@@ -20,19 +20,26 @@ db.exec(`
     role TEXT, -- 'advertiser', 'driver', 'admin'
     name TEXT,
     balance REAL DEFAULT 0,
+    bank_name TEXT,
+    account_number TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
   CREATE TABLE IF NOT EXISTS devices (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     owner_id INTEGER,
+    driver_id INTEGER,
+    device_id TEXT UNIQUE,
     vehicle_type TEXT,
     vehicle_reg TEXT,
     status TEXT DEFAULT 'offline',
+    battery_level INTEGER DEFAULT 100,
     last_lat REAL,
     last_lng REAL,
+    last_ping DATETIME DEFAULT CURRENT_TIMESTAMP,
     last_heartbeat DATETIME,
-    FOREIGN KEY(owner_id) REFERENCES users(id)
+    FOREIGN KEY(owner_id) REFERENCES users(id),
+    FOREIGN KEY(driver_id) REFERENCES users(id)
   );
 
   CREATE TABLE IF NOT EXISTS campaigns (
@@ -97,17 +104,27 @@ db.exec(`
 
 // Migration: Ensure columns exist (in case DB was created with older schema)
 try { db.exec("ALTER TABLE users ADD COLUMN balance REAL DEFAULT 0"); } catch (e) {}
+try { db.exec("ALTER TABLE users ADD COLUMN bank_name TEXT"); } catch (e) {}
+try { db.exec("ALTER TABLE users ADD COLUMN account_number TEXT"); } catch (e) {}
+try { db.exec("ALTER TABLE devices ADD COLUMN driver_id INTEGER"); } catch (e) {}
+try { db.exec("ALTER TABLE devices ADD COLUMN device_id TEXT"); } catch (e) {}
+try { db.exec("ALTER TABLE devices ADD COLUMN battery_level INTEGER DEFAULT 100"); } catch (e) {}
+try { db.exec("ALTER TABLE devices ADD COLUMN last_ping DATETIME DEFAULT CURRENT_TIMESTAMP"); } catch (e) {}
 try { db.exec("ALTER TABLE campaigns ADD COLUMN created_at DATETIME DEFAULT '2026-01-01 00:00:00'"); } catch (e) {}
 try { db.exec("ALTER TABLE ads ADD COLUMN approval_status TEXT DEFAULT 'pending'"); } catch (e) {}
 
 // Seed some data if empty
 const userCount = db.prepare("SELECT COUNT(*) as count FROM users").get() as { count: number };
 if (userCount.count === 0) {
-  db.prepare("INSERT INTO users (email, role, name, balance) VALUES (?, ?, ?, ?)").run("advertiser@example.com", "advertiser", "Tunde Okafor", 124500);
-  db.prepare("INSERT INTO users (email, role, name, balance) VALUES (?, ?, ?, ?)").run("driver@example.com", "driver", "Emeka Nwosu", 24500);
+  db.prepare("INSERT INTO users (email, role, name, balance, bank_name, account_number) VALUES (?, ?, ?, ?, ?, ?)")
+    .run("advertiser@example.com", "advertiser", "Tunde Okafor", 124500, null, null);
+  db.prepare("INSERT INTO users (email, role, name, balance, bank_name, account_number) VALUES (?, ?, ?, ?, ?, ?)")
+    .run("driver@example.com", "driver", "Emeka Nwosu", 24500, "Access Bank", "0123456789");
   
-  db.prepare("INSERT INTO devices (owner_id, vehicle_type, vehicle_reg, status, last_lat, last_lng) VALUES (?, ?, ?, ?, ?, ?)")
-    .run(2, "Danfo", "LAG-123-XY", "online", 6.5244, 3.3792);
+  db.prepare("INSERT INTO devices (owner_id, driver_id, device_id, vehicle_type, vehicle_reg, status, battery_level, last_lat, last_lng) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+    .run(2, 2, "DF-2026-001", "Danfo", "LAG-123-XY", "online", 85, 6.5244, 3.3792);
+  db.prepare("INSERT INTO devices (owner_id, driver_id, device_id, vehicle_type, vehicle_reg, status, battery_level, last_lat, last_lng) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+    .run(2, 2, "DF-2026-002", "Danfo", "LAG-456-ZZ", "offline", 12, 6.4531, 3.3958);
 
   db.prepare("INSERT INTO campaigns (advertiser_id, name, budget, cpm_rate, geofence_lat, geofence_lng, geofence_radius) VALUES (?, ?, ?, ?, ?, ?, ?)")
     .run(1, "Indomie Morning Rush", 50000, 50, 6.5244, 3.3792, 5000);

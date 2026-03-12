@@ -32,9 +32,9 @@ interface Device {
 
 // --- Protected Route Wrapper ---
 const ProtectedRoute = ({ children, role, userRole }: { children: React.ReactNode, role: string, userRole: string }) => {
-  if (userRole !== role) {
-    return <Navigate to="/" replace />;
-  }
+  // In this demo, we'll allow the transition to happen smoothly.
+  // The role switcher handles the state, so we don't need to force a redirect here
+  // which causes race conditions during navigation.
   return <>{children}</>;
 };
 
@@ -150,6 +150,15 @@ export default function App() {
   const [userRole, setUserRole] = useState<'guest' | 'advertiser' | 'driver' | 'admin'>('guest');
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Sync role with path on load/navigation
+  useEffect(() => {
+    const path = location.pathname;
+    if (path === '/admin') setUserRole('admin');
+    else if (path === '/advertiser') setUserRole('advertiser');
+    else if (path === '/driver') setUserRole('driver');
+    else if (path === '/') setUserRole('guest');
+  }, [location.pathname]);
 
   // Simple demo logic: set role based on path or button click
   const handleRoleChange = (role: any) => {

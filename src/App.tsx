@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { LandingPage } from './components/LandingPage';
 import { AdvertiserDashboard } from './components/AdvertiserDashboard';
 import { DriverPortal } from './components/DriverPortal';
-import { AdminDashboard } from './components/AdminDashboard';
+import AdminDashboard from './components/AdminDashboard';
 import { QrCode, Activity, MapPin, ChevronLeft } from 'lucide-react';
 import { Routes, Route, useNavigate, Navigate, useLocation } from 'react-router-dom';
 
@@ -42,19 +42,49 @@ const ProtectedRoute = ({ children, role, userRole }: { children: React.ReactNod
 const AdPlayer = ({ onBack }: { onBack: () => void }) => {
   const [currentAd, setCurrentAd] = useState<any>(null);
   const [location, setLocation] = useState({ lat: 6.5244, lng: 3.3792 }); // Lagos default
+  const [speed, setSpeed] = useState(45); // km/h
+  const [isLogging, setIsLogging] = useState(false);
 
   useEffect(() => {
     const fetchAd = async () => {
       const res = await fetch(`/api/ads/active?lat=${location.lat}&lng=${location.lng}`);
       const ads = await res.json();
       if (ads.length > 0) {
-        setCurrentAd(ads[Math.floor(Math.random() * ads.length)]);
+        const selected = ads[Math.floor(Math.random() * ads.length)];
+        setCurrentAd(selected);
       }
     };
     fetchAd();
-    const interval = setInterval(fetchAd, 10000);
+    const interval = setInterval(fetchAd, 15000); // Change ad every 15s
     return () => clearInterval(interval);
   }, [location]);
+
+  // Log impression when ad changes
+  useEffect(() => {
+    if (currentAd) {
+      const logImpression = async () => {
+        setIsLogging(true);
+        try {
+          await fetch('/api/impressions/log', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              deviceId: 'DF-2026-001', // Mock device ID
+              adId: currentAd.id,
+              lat: location.lat,
+              lng: location.lng,
+              speed: speed
+            })
+          });
+        } catch (err) {
+          console.error("Failed to log impression", err);
+        } finally {
+          setIsLogging(false);
+        }
+      };
+      logImpression();
+    }
+  }, [currentAd, location, speed]);
 
   return (
     <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6">
@@ -90,6 +120,21 @@ const AdPlayer = ({ onBack }: { onBack: () => void }) => {
                   <Activity size={16} /> Sponsored by {currentAd.campaign_name}
                 </p>
               </div>
+              
+              {/* Verification Status Overlay */}
+              <div className="absolute bottom-12 left-12 flex gap-4">
+                <div className={`px-4 py-2 rounded-xl backdrop-blur-md border ${speed > 5 ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400' : 'bg-red-500/20 border-red-500/50 text-red-400'} text-xs font-bold uppercase tracking-widest`}>
+                  {speed > 5 ? 'Moving' : 'Stopped'}
+                </div>
+                <div className="px-4 py-2 bg-black/60 backdrop-blur-md border border-white/10 rounded-xl text-xs font-bold text-white uppercase tracking-widest">
+                  {speed} KM/H
+                </div>
+                {isLogging && (
+                  <div className="px-4 py-2 bg-yellow-400/20 border border-yellow-400/50 rounded-xl text-xs font-bold text-yellow-400 uppercase tracking-widest animate-pulse">
+                    Verifying...
+                  </div>
+                )}
+              </div>
             </motion.div>
           ) : (
             <div className="w-full h-full flex items-center justify-center text-zinc-500">
@@ -122,6 +167,21 @@ const AdPlayer = ({ onBack }: { onBack: () => void }) => {
                   {loc.name}
                 </button>
               ))}
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <h3 className="text-xs font-black text-zinc-500 uppercase tracking-[0.2em]">Simulated Speed</h3>
+            <div className="flex items-center gap-4">
+              <input 
+                type="range" 
+                min="0" 
+                max="100" 
+                value={speed} 
+                onChange={(e) => setSpeed(parseInt(e.target.value))}
+                className="w-48 h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-yellow-400"
+              />
+              <span className="text-xl font-black w-16">{speed} <span className="text-xs text-zinc-500">KM/H</span></span>
             </div>
           </div>
 

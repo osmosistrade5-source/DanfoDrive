@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { ChevronRight, Play, Shield, Zap, MapPin, TrendingUp } from 'lucide-react';
+import { ChevronRight, Play, Shield, Zap, MapPin, TrendingUp, CheckCircle2, QrCode, Activity } from 'lucide-react';
 
 export const LandingPage = ({ onGetStarted }: { onGetStarted: (role: string) => void }) => {
   const [budget, setBudget] = useState(50000);
@@ -140,9 +140,13 @@ export const LandingPage = ({ onGetStarted }: { onGetStarted: (role: string) => 
             <div className="bg-zinc-900 border border-zinc-800 p-10 rounded-3xl shadow-2xl">
               <h3 className="text-2xl font-bold mb-8">Reach Calculator</h3>
               <div className="space-y-10">
+                <div className="p-4 bg-yellow-400/5 border border-yellow-400/20 rounded-2xl mb-8">
+                  <p className="text-xs font-black uppercase tracking-widest text-yellow-400 mb-1">Platform Access Fee</p>
+                  <p className="text-sm text-zinc-400">Monthly subscription starts from <span className="text-white font-bold">₦50,000</span>. This unlocks the dashboard and targeting tools.</p>
+                </div>
                 <div>
                   <div className="flex justify-between mb-4">
-                    <label className="text-zinc-400 font-medium">Monthly Budget</label>
+                    <label className="text-zinc-400 font-medium">Campaign Spend</label>
                     <span className="text-yellow-400 font-mono font-bold text-xl">₦{budget.toLocaleString()}</span>
                   </div>
                   <input 
@@ -176,6 +180,52 @@ export const LandingPage = ({ onGetStarted }: { onGetStarted: (role: string) => 
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Pricing Table */}
+      <section className="py-24 px-6 border-t border-zinc-900">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-black tracking-tight mb-4">Simple, Transparent Pricing</h2>
+            <p className="text-zinc-500">Choose the plan that fits your advertising needs.</p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {[
+              { name: 'Starter', price: '50,000', drivers: '20', features: ['Dashboard Access', 'Route Targeting', 'Basic Analytics'] },
+              { name: 'Growth', price: '150,000', drivers: '100', features: ['Priority Support', 'Advanced Analytics', 'Custom Scheduling'], popular: true },
+              { name: 'Enterprise', price: 'Custom', drivers: 'Unlimited', features: ['API Access', 'Dedicated Account Manager', 'Bulk Discounts'] }
+            ].map((plan, i) => (
+              <div key={i} className={`p-10 rounded-[2.5rem] border ${plan.popular ? 'bg-zinc-900 border-yellow-400 shadow-2xl shadow-yellow-400/5' : 'bg-zinc-950 border-zinc-800'} flex flex-col`}>
+                {plan.popular && <span className="text-[10px] font-black uppercase tracking-widest text-yellow-400 mb-4 inline-block">Most Popular</span>}
+                <h3 className="text-2xl font-black mb-2">{plan.name}</h3>
+                <div className="flex items-baseline gap-1 mb-8">
+                  <span className="text-4xl font-black">₦{plan.price}</span>
+                  {plan.price !== 'Custom' && <span className="text-zinc-500 font-bold">/mo</span>}
+                </div>
+                <ul className="space-y-4 mb-10 flex-1">
+                  <li className="text-sm font-bold text-zinc-300 flex items-center gap-2">
+                    <CheckCircle2 size={16} className="text-emerald-400" /> Up to {plan.drivers} drivers
+                  </li>
+                  {plan.features.map((f, j) => (
+                    <li key={j} className="text-sm font-bold text-zinc-300 flex items-center gap-2">
+                      <CheckCircle2 size={16} className="text-emerald-400" /> {f}
+                    </li>
+                  ))}
+                </ul>
+                <button 
+                  onClick={() => onGetStarted('advertiser')}
+                  className={`w-full py-4 rounded-2xl font-black transition-all ${plan.popular ? 'bg-yellow-400 text-black hover:scale-105' : 'bg-zinc-800 text-white hover:bg-zinc-700'}`}
+                >
+                  Get Started
+                </button>
+              </div>
+            ))}
+          </div>
+          <p className="text-center mt-12 text-zinc-500 text-sm">
+            * All plans include a base ₦10 per minute ad playback fee.
+          </p>
         </div>
       </section>
 

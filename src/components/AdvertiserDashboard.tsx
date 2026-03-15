@@ -45,7 +45,6 @@ const routeData = [
 
 const CreateCampaignFlow = ({ setActiveTab, wallet, routes, onRefresh, initialRouteId }: any) => {
   const [step, setStep] = useState(1);
-  const [isPaying, setIsPaying] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     budget: 50000,
@@ -54,6 +53,9 @@ const CreateCampaignFlow = ({ setActiveTab, wallet, routes, onRefresh, initialRo
     minPerformance: 80,
     schedule: [{ start: '08:00', end: '10:00' }]
   });
+
+  const [isLaunching, setIsLaunching] = useState(false);
+  const [isPaying, setIsPaying] = useState(false);
 
   const hasSubscription = wallet?.subscription_tier && wallet.subscription_tier !== 'none';
 
@@ -70,6 +72,42 @@ const CreateCampaignFlow = ({ setActiveTab, wallet, routes, onRefresh, initialRo
       }
     } finally {
       setIsPaying(false);
+    }
+  };
+
+  const handleLaunch = async () => {
+    if (!formData.name || !formData.routeId) {
+      alert("Please provide a campaign name and select a route.");
+      return;
+    }
+
+    setIsLaunching(true);
+    try {
+      const res = await fetch('/api/campaigns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          advertiser_id: 1,
+          name: formData.name,
+          budget: formData.budget,
+          route_id: formData.routeId,
+          drivers_count: formData.drivers,
+          schedule_json: formData.schedule
+        })
+      });
+
+      if (res.ok) {
+        await onRefresh();
+        setActiveTab('campaigns');
+      } else {
+        const err = await res.json();
+        alert(err.error || "Failed to launch campaign");
+      }
+    } catch (error) {
+      console.error("Launch error:", error);
+      alert("An error occurred while launching the campaign.");
+    } finally {
+      setIsLaunching(false);
     }
   };
 
@@ -159,33 +197,46 @@ const CreateCampaignFlow = ({ setActiveTab, wallet, routes, onRefresh, initialRo
         {step === 1 && (
           <div className="space-y-8">
             <div className="flex items-center gap-4 mb-4">
-              <div className="p-3 bg-emerald-400/10 text-emerald-400 rounded-2xl"><Wallet size={32} /></div>
+              <div className="p-3 bg-emerald-400/10 text-emerald-400 rounded-2xl"><Megaphone size={32} /></div>
               <div>
-                <h3 className="text-xl font-bold">Campaign Budget Wallet</h3>
-                <p className="text-zinc-500 text-sm">Funds are deducted automatically per minute of playback.</p>
+                <h3 className="text-xl font-bold">Campaign Basics</h3>
+                <p className="text-zinc-500 text-sm">Give your campaign a name and set your initial budget.</p>
               </div>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="p-8 bg-zinc-800/50 rounded-3xl border border-zinc-800">
-                <p className="text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Available Balance</p>
-                <p className="text-4xl font-black">₦{(wallet?.balance || 0).toLocaleString()}</p>
-                <button className="mt-6 w-full py-3 bg-white text-black rounded-xl font-black text-sm hover:bg-yellow-400 transition-colors">
-                  Deposit Funds
-                </button>
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-zinc-400 uppercase tracking-widest">Campaign Name</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. Indomie Morning Rush"
+                  value={formData.name}
+                  onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  className="w-full bg-zinc-800 border-none rounded-2xl p-4 text-xl font-bold focus:ring-2 focus:ring-yellow-400"
+                />
               </div>
-              <div className="space-y-4">
-                <label className="text-sm font-bold text-zinc-400 uppercase tracking-widest">Set Campaign Budget</label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-zinc-500">₦</span>
-                  <input 
-                    type="number" 
-                    value={formData.budget}
-                    onChange={(e) => setFormData({...formData, budget: Number(e.target.value)})}
-                    className="w-full bg-zinc-800 border-none rounded-2xl p-4 pl-8 text-xl font-bold focus:ring-2 focus:ring-yellow-400"
-                  />
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="p-8 bg-zinc-800/50 rounded-3xl border border-zinc-800">
+                  <p className="text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Available Balance</p>
+                  <p className="text-4xl font-black">₦{(wallet?.balance || 0).toLocaleString()}</p>
+                  <button className="mt-6 w-full py-3 bg-white text-black rounded-xl font-black text-sm hover:bg-yellow-400 transition-colors">
+                    Deposit Funds
+                  </button>
                 </div>
-                <p className="text-xs text-zinc-500">Estimated duration: <span className="text-yellow-400 font-bold">{estDuration} days</span></p>
+                <div className="space-y-4">
+                  <label className="text-sm font-bold text-zinc-400 uppercase tracking-widest">Set Campaign Budget</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-zinc-500">₦</span>
+                    <input 
+                      type="number" 
+                      value={formData.budget}
+                      onChange={(e) => setFormData({...formData, budget: Number(e.target.value)})}
+                      className="w-full bg-zinc-800 border-none rounded-2xl p-4 pl-8 text-xl font-bold focus:ring-2 focus:ring-yellow-400"
+                    />
+                  </div>
+                  <p className="text-xs text-zinc-500">Estimated duration: <span className="text-yellow-400 font-bold">{estDuration} days</span></p>
+                </div>
               </div>
             </div>
           </div>
@@ -378,15 +429,17 @@ const CreateCampaignFlow = ({ setActiveTab, wallet, routes, onRefresh, initialRo
         <div className="mt-12 flex justify-between">
           <button 
             onClick={() => setStep(Math.max(1, step - 1))}
+            disabled={isLaunching}
             className={`px-8 py-4 font-bold text-zinc-500 hover:text-white transition-colors ${step === 1 ? 'invisible' : ''}`}
           >
             Back
           </button>
           <button 
-            onClick={() => step === 6 ? setActiveTab('campaigns') : setStep(step + 1)}
-            className="bg-yellow-400 text-black px-12 py-4 rounded-2xl font-black text-lg hover:scale-105 transition-transform"
+            onClick={() => step === 6 ? handleLaunch() : setStep(step + 1)}
+            disabled={isLaunching}
+            className="bg-yellow-400 text-black px-12 py-4 rounded-2xl font-black text-lg hover:scale-105 transition-transform disabled:opacity-50"
           >
-            {step === 6 ? 'Launch Campaign' : 'Next Step'}
+            {isLaunching ? 'Launching...' : step === 6 ? 'Launch Campaign' : 'Next Step'}
           </button>
         </div>
       </motion.div>
@@ -420,7 +473,13 @@ const RouteHeatmap = ({ routes, onSelectRoute, selectedRoute }: any) => {
       {/* Routes Layer */}
       <svg viewBox="0 0 1000 600" className="absolute inset-0 w-full h-full">
         {routes.map((route: any) => {
-          const coords = JSON.parse(route.coordinates || "[]");
+          let coords = [];
+          try {
+            coords = JSON.parse(route.coordinates || "[]");
+          } catch (e) {
+            console.error("Failed to parse coordinates for route", route.id);
+            return null;
+          }
           if (coords.length < 2) return null;
           
           const pathD = `M${coords[0][0]},${coords[0][1]} ${coords.slice(1).map((c: any) => `L${c[0]},${c[1]}`).join(' ')}`;
@@ -489,7 +548,7 @@ const StatRow = ({ label, value, icon: Icon }: any) => (
   </div>
 );
 
-const renderSmartRoutes = (routes: any[], selectedRoute: any, setSelectedRoute: any, setActiveTab: any, setInitialRouteId: any) => {
+const SmartRoutes = ({ routes, selectedRoute, setSelectedRoute, setActiveTab, setInitialRouteId }: any) => {
   const [filterCity, setFilterCity] = useState('All Cities');
   const [filterType, setFilterType] = useState('All Types');
   const [filterTime, setFilterTime] = useState('Morning Peak');
@@ -501,10 +560,10 @@ const renderSmartRoutes = (routes: any[], selectedRoute: any, setSelectedRoute: 
     // Mock density logic based on time of day
     let density = r.current_density;
     if (filterTime === 'Morning Peak') {
-      if (r.name.includes('Ikeja') || r.name.includes('Oshodi') || r.name.includes('Gwarinpa')) density = 'high';
+      if (r.name?.includes('Ikeja') || r.name?.includes('Oshodi') || r.name?.includes('Gwarinpa')) density = 'high';
       else density = 'medium';
     } else if (filterTime === 'Evening Peak') {
-      if (r.name.includes('CMS') || r.name.includes('Lekki') || r.name.includes('Maitama')) density = 'high';
+      if (r.name?.includes('CMS') || r.name?.includes('Lekki') || r.name?.includes('Maitama')) density = 'high';
       else density = 'medium';
     } else if (filterTime === 'Off-Peak') {
       density = 'low';
@@ -588,8 +647,8 @@ const renderSmartRoutes = (routes: any[], selectedRoute: any, setSelectedRoute: 
               </div>
 
               <div className="space-y-1">
-                <StatRow label="Avg Passengers / Hr" value={selectedRoute.avg_passengers_per_hour.toLocaleString()} icon={Users} />
-                <StatRow label="Daily Impressions" value={selectedRoute.est_passengers_daily.toLocaleString()} icon={Eye} />
+                <StatRow label="Avg Passengers / Hr" value={selectedRoute.avg_passengers_per_hour?.toLocaleString()} icon={Users} />
+                <StatRow label="Daily Impressions" value={selectedRoute.est_passengers_daily?.toLocaleString()} icon={Eye} />
                 <StatRow label="Active Vehicles" value={selectedRoute.available_vehicles} icon={Truck} />
                 <StatRow label="Peak Hours" value={selectedRoute.peak_hours} icon={Clock} />
                 <StatRow label="Route Duration" value={`${selectedRoute.duration_mins} mins`} icon={Timer} />
@@ -793,8 +852,8 @@ export const AdvertiserDashboard = () => {
               <button className="px-3 py-1 text-zinc-500 text-xs font-bold">30D</button>
             </div>
           </div>
-          <div className="h-[300px] min-w-0">
-            <ResponsiveContainer width="100%" height="100%" debounce={100} minWidth={0}>
+          <div className="h-[300px] w-full min-w-0">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <AreaChart data={impressionTrendData}>
                 <defs>
                   <linearGradient id="colorImp" x1="0" y1="0" x2="0" y2="1">
@@ -1153,7 +1212,13 @@ export const AdvertiserDashboard = () => {
               >
                 {activeTab === 'overview' && renderOverview()}
                 {activeTab === 'campaigns' && renderCampaigns()}
-                {activeTab === 'routes' && renderSmartRoutes(routes, selectedRoute, setSelectedRoute, setActiveTab, setInitialRouteId)}
+                {activeTab === 'routes' && <SmartRoutes 
+                  routes={routes} 
+                  selectedRoute={selectedRoute} 
+                  setSelectedRoute={setSelectedRoute} 
+                  setActiveTab={setActiveTab} 
+                  setInitialRouteId={setInitialRouteId} 
+                />}
                 {activeTab === 'create' && <CreateCampaignFlow 
                   setActiveTab={setActiveTab} 
                   wallet={wallet} 

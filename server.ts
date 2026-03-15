@@ -460,12 +460,17 @@ async function startServer() {
   });
 
   app.post("/api/campaigns", (req, res) => {
-    const { advertiser_id, name, budget, cpm_rate, geofence_lat, geofence_lng, geofence_radius } = req.body;
-    const result = db.prepare(`
-      INSERT INTO campaigns (advertiser_id, name, budget, cpm_rate, geofence_lat, geofence_lng, geofence_radius)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(advertiser_id || 1, name, budget, cpm_rate, geofence_lat, geofence_lng, geofence_radius);
-    res.json({ id: result.lastInsertRowid });
+    const { advertiser_id, name, budget, route_id, drivers_count, schedule_json } = req.body;
+    try {
+      const result = db.prepare(`
+        INSERT INTO campaigns (advertiser_id, name, budget, budget_remaining, route_id, drivers_count, schedule_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(advertiser_id || 1, name, budget, budget, route_id, drivers_count, JSON.stringify(schedule_json));
+      res.json({ id: result.lastInsertRowid });
+    } catch (error) {
+      console.error("Error creating campaign:", error);
+      res.status(500).json({ error: "Failed to create campaign" });
+    }
   });
 
   app.get("/api/ads/pending", (req, res) => {
@@ -498,6 +503,8 @@ async function startServer() {
     res.json(logs);
   });
 
+  const MIN_PAYOUT_THRESHOLD = 5000;
+
   app.get("/api/driver/stats/:userId", (req, res) => {
     const userId = req.params.userId;
     const user = db.prepare("SELECT balance FROM users WHERE id = ?").get(userId) as any;
@@ -517,6 +524,8 @@ async function startServer() {
 
     res.json({
       balance: user?.balance || 0,
+      pendingBalance: todayStats?.earnings || 0,
+      minPayoutThreshold: MIN_PAYOUT_THRESHOLD,
       todayEarnings: todayStats?.earnings || 0,
       todayMinutes: todayStats?.minutes || 0,
       activeCampaigns: activeCampaigns?.count || 0,
@@ -623,6 +632,10 @@ async function startServer() {
     const { userId, amount, bankName, accountNumber } = req.body;
     const user = db.prepare("SELECT balance FROM users WHERE id = ?").get(userId) as any;
     
+    if (amount < MIN_PAYOUT_THRESHOLD) {
+      return res.status(400).json({ error: `Minimum withdrawal amount is ₦${MIN_PAYOUT_THRESHOLD.toLocaleString()}` });
+    }
+
     if (user.balance < amount) {
       return res.status(400).json({ error: "Insufficient balance" });
     }
@@ -655,6 +668,19 @@ async function startServer() {
         // 3. Log Transaction
         db.prepare("INSERT INTO wallet_transactions (user_id, amount, type, description) VALUES (?, ?, ?, ?)")
           .run(stat.driver_id, stat.earnings, 'deposit', `Daily Earnings Settlement`);
+
+        // 4. Auto-Payout Trigger (if balance > 20,000)
+        const updatedUser = db.prepare("SELECT balance FROM users WHERE id = ?").get(stat.driver_id) as any;
+        const AUTO_PAYOUT_THRESHOLD = 20000;
+        if (updatedUser.balance >= AUTO_PAYOUT_THRESHOLD) {
+          const payoutAmount = updatedUser.balance;
+          db.prepare("UPDATE users SET balance = 0 WHERE id = ?").run(stat.driver_id);
+          db.prepare("INSERT INTO payouts (user_id, amount, bank_name, account_number, status) VALUES (?, ?, ?, ?, ?)")
+            .run(stat.driver_id, payoutAmount, 'Auto-Payout (Default Bank)', '8123456789', 'paid');
+          db.prepare("INSERT INTO wallet_transactions (user_id, amount, type, description) VALUES (?, ?, ?, ?)")
+            .run(stat.driver_id, -payoutAmount, 'payout', `Auto-payout triggered (Threshold: ₦${AUTO_PAYOUT_THRESHOLD.toLocaleString()})`);
+          console.log(`[SETTLEMENT] Auto-payout triggered for Driver ${stat.driver_id}: ₦${payoutAmount.toLocaleString()}`);
+        }
       }
       
       // Clear stats for the day to avoid double counting if run again

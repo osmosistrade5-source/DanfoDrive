@@ -27,8 +27,11 @@ const earningsTrendData = [
 
 // --- Sub-Components ---
 
-const StatCard = ({ label, value, icon: Icon, trend, color = "yellow" }: any) => (
-  <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl">
+const StatCard = ({ label, value, icon: Icon, trend, color = "yellow", onClick }: any) => (
+  <div 
+    onClick={onClick}
+    className={`bg-zinc-900 border border-zinc-800 p-6 rounded-2xl transition-all ${onClick ? 'cursor-pointer hover:border-zinc-700 hover:scale-[1.02] active:scale-[0.98]' : ''}`}
+  >
     <div className="flex justify-between items-start mb-4">
       <div className={`p-2 bg-zinc-800 rounded-lg text-${color}-400`}>
         <Icon size={24} />
@@ -105,11 +108,24 @@ export const DriverPortal = () => {
     }
   };
 
+  const handleRejectCampaign = async (campaignId: number) => {
+    // For demo, we just filter it out locally or we could have a backend endpoint
+    // Let's assume we just want to remove it from the list for now
+    setRequests(prev => prev.filter(r => r.id !== campaignId));
+  };
+
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [isWithdrawing, setIsWithdrawing] = useState(false);
 
   const handleWithdraw = async () => {
+    const amount = parseFloat(withdrawAmount);
     if (!withdrawAmount || isWithdrawing) return;
+    
+    if (amount < (stats?.minPayoutThreshold || 5000)) {
+      alert(`Minimum withdrawal amount is ₦${(stats?.minPayoutThreshold || 5000).toLocaleString()}`);
+      return;
+    }
+
     setIsWithdrawing(true);
     try {
       const res = await fetch('/api/driver/withdraw', {
@@ -117,7 +133,7 @@ export const DriverPortal = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           userId: DRIVER_ID, 
-          amount: parseFloat(withdrawAmount),
+          amount: amount,
           bankName: 'OPay Digital Bank',
           accountNumber: '8123456789'
         })
@@ -151,10 +167,16 @@ export const DriverPortal = () => {
   const renderOverview = () => (
     <div className="space-y-8">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard label="Wallet Balance" value={`₦${(stats?.balance || 0).toLocaleString()}`} icon={Wallet} color="emerald" />
+        <StatCard 
+          label="Wallet Balance" 
+          value={`₦${(stats?.balance || 0).toLocaleString()}`} 
+          icon={Wallet} 
+          color="emerald" 
+          onClick={() => setActiveTab('wallet')}
+        />
         <StatCard label="Performance Score" value={`${performance?.overall_score || 0}/100`} icon={ShieldCheck} trend={performance?.rank_category} color="yellow" />
-        <StatCard label="Active Campaigns" value={stats?.activeCampaigns || 0} icon={Play} />
-        <StatCard label="Mins Played Today" value={`${stats?.todayMinutes || 0}m`} icon={Timer} />
+        <StatCard label="Active Campaigns" value={stats?.activeCampaigns || 0} icon={Play} onClick={() => setActiveTab('active')} />
+        <StatCard label="Mins Played Today" value={`${stats?.todayMinutes || 0}m`} icon={Timer} onClick={() => setActiveTab('earnings')} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -305,16 +327,16 @@ export const DriverPortal = () => {
             <h3 className="text-xl font-bold mb-6 text-zinc-100">Improvement Tips</h3>
             <div className="space-y-6">
               {[
-                { title: 'Stay on Route', desc: 'Ensure you follow the assigned campaign route to maximize compliance score.', icon: MapPin },
-                { title: 'Device Connectivity', desc: 'Keep your device powered and connected to the internet during active hours.', icon: Zap },
-                { title: 'Accept More Requests', desc: 'Accepting more campaigns improves your acceptance rate and visibility.', icon: Megaphone },
+                { title: 'Stay on Route', desc: 'Ensure you follow the assigned campaign route to maximize compliance score.', icon: MapPin, action: () => setActiveTab('active') },
+                { title: 'Device Connectivity', desc: 'Keep your device powered and connected to the internet during active hours.', icon: Zap, action: () => setActiveTab('settings') },
+                { title: 'Accept More Requests', desc: 'Accepting more campaigns improves your acceptance rate and visibility.', icon: Megaphone, action: () => setActiveTab('requests') },
               ].map((tip, i) => (
-                <div key={i} className="flex gap-4">
-                  <div className="w-10 h-10 bg-zinc-800 rounded-xl flex-shrink-0 flex items-center justify-center text-yellow-400">
+                <div key={i} className="flex gap-4 group cursor-pointer" onClick={tip.action}>
+                  <div className="w-10 h-10 bg-zinc-800 rounded-xl flex-shrink-0 flex items-center justify-center text-yellow-400 group-hover:bg-yellow-400 group-hover:text-black transition-colors">
                     <tip.icon size={20} />
                   </div>
                   <div>
-                    <h4 className="font-bold text-sm text-zinc-100">{tip.title}</h4>
+                    <h4 className="font-bold text-sm text-zinc-100 group-hover:text-yellow-400 transition-colors">{tip.title}</h4>
                     <p className="text-xs text-zinc-500 leading-relaxed mt-1">{tip.desc}</p>
                   </div>
                 </div>
@@ -398,7 +420,10 @@ export const DriverPortal = () => {
               >
                 Accept Campaign
               </button>
-              <button className="flex-1 bg-zinc-800 text-white py-3 rounded-xl font-black hover:bg-zinc-700 transition-colors">
+              <button 
+                onClick={() => handleRejectCampaign(req.id)}
+                className="flex-1 bg-zinc-800 text-white py-3 rounded-xl font-black hover:bg-zinc-700 transition-colors"
+              >
                 Reject
               </button>
             </div>
@@ -483,12 +508,20 @@ export const DriverPortal = () => {
 
   const renderEarnings = () => (
     <div className="space-y-8">
-      <h2 className="text-3xl font-black tracking-tight">Earnings Tracker</h2>
+      <div className="flex justify-between items-center">
+        <h2 className="text-3xl font-black tracking-tight">Earnings Tracker</h2>
+        <button 
+          onClick={() => setActiveTab('wallet')}
+          className="bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-colors"
+        >
+          View Wallet
+        </button>
+      </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard label="Minutes Today" value={`${stats?.todayMinutes || 0}m`} icon={Timer} />
+        <StatCard label="Minutes Today" value={`${stats?.todayMinutes || 0}m`} icon={Timer} onClick={() => setActiveTab('active')} />
         <StatCard label="Pay Per Minute" value="₦10" icon={DollarSign} />
-        <StatCard label="Today's Earnings" value={`₦${(stats?.todayEarnings || 0).toLocaleString()}`} icon={TrendingUp} color="emerald" />
+        <StatCard label="Today's Earnings" value={`₦${(stats?.todayEarnings || 0).toLocaleString()}`} icon={TrendingUp} color="emerald" onClick={() => setActiveTab('wallet')} />
         <StatCard label="Total Lifetime" value="₦184,500" icon={ShieldCheck} />
       </div>
 
@@ -538,39 +571,88 @@ export const DriverPortal = () => {
     </div>
   );
 
-  const renderWallet = () => (
-    <div className="space-y-8">
-      <h2 className="text-3xl font-black tracking-tight">Wallet</h2>
-      
-      <div className="bg-yellow-400 rounded-[2.5rem] p-12 text-black relative overflow-hidden shadow-2xl shadow-yellow-400/20">
-        <div className="relative z-10">
-          <p className="text-xs font-black uppercase tracking-[0.2em] opacity-60 mb-4">Available Balance</p>
-          <h2 className="text-7xl font-black tracking-tighter mb-12">₦{(stats?.balance || 0).toLocaleString()}</h2>
-          <div className="flex flex-wrap gap-4">
-            <button 
-              onClick={() => setShowWithdrawModal(true)}
-              className="bg-black text-white px-10 py-5 rounded-2xl font-black text-lg flex items-center gap-2 hover:scale-105 transition-transform"
-            >
-              Withdraw Funds <ArrowUpRight size={24} />
-            </button>
-            <button className="bg-white/20 backdrop-blur-md text-black px-10 py-5 rounded-2xl font-black text-lg hover:bg-white/30 transition-colors">
-              Transaction History
-            </button>
+  const renderWallet = () => {
+    const balance = stats?.balance || 0;
+    const pending = stats?.pendingBalance || 0;
+    const threshold = stats?.minPayoutThreshold || 5000;
+    const progress = Math.min((balance / threshold) * 100, 100);
+    const isThresholdReached = balance >= threshold;
+
+    return (
+      <div className="space-y-8">
+        <div className="flex justify-between items-center">
+          <h2 className="text-3xl font-black tracking-tight">Wallet</h2>
+          {isThresholdReached ? (
+            <div className="flex items-center gap-2 bg-emerald-400/10 text-emerald-400 px-4 py-2 rounded-xl border border-emerald-400/20">
+              <CheckCircle2 size={18} />
+              <span className="text-sm font-bold uppercase tracking-widest">Payout Threshold Reached</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 bg-yellow-400/10 text-yellow-400 px-4 py-2 rounded-xl border border-yellow-400/20">
+              <AlertCircle size={18} />
+              <span className="text-sm font-bold uppercase tracking-widest">₦{(threshold - balance).toLocaleString()} more to withdraw</span>
+            </div>
+          )}
+        </div>
+        
+        <div className="bg-yellow-400 rounded-[2.5rem] p-12 text-black relative overflow-hidden shadow-2xl shadow-yellow-400/20">
+          <div className="relative z-10">
+            <p className="text-xs font-black uppercase tracking-[0.2em] opacity-60 mb-4">Available Balance</p>
+            <h2 className="text-7xl font-black tracking-tighter mb-12">₦{balance.toLocaleString()}</h2>
+            <div className="flex flex-wrap gap-4">
+              <button 
+                onClick={() => setShowWithdrawModal(true)}
+                disabled={!isThresholdReached}
+                className={`px-10 py-5 rounded-2xl font-black text-lg flex items-center gap-2 transition-all ${
+                  isThresholdReached 
+                    ? 'bg-black text-white hover:scale-105' 
+                    : 'bg-black/20 text-black/40 cursor-not-allowed'
+                }`}
+              >
+                {isThresholdReached ? 'Withdraw Funds' : 'Threshold Not Reached'} <ArrowUpRight size={24} />
+              </button>
+              <button 
+                onClick={() => setActiveTab('history')}
+                className="bg-white/20 backdrop-blur-md text-black px-10 py-5 rounded-2xl font-black text-lg hover:bg-white/30 transition-colors"
+              >
+                Transaction History
+              </button>
+            </div>
+          </div>
+          <div className="absolute top-0 right-0 p-12 opacity-10">
+            <Wallet size={240} />
           </div>
         </div>
-        <div className="absolute top-0 right-0 p-12 opacity-10">
-          <Wallet size={240} />
-        </div>
-      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-3xl">
-          <p className="text-zinc-500 text-xs font-black uppercase tracking-widest mb-2">Pending Earnings</p>
-          <p className="text-3xl font-black">₦4,200</p>
-          <p className="text-zinc-500 text-xs mt-4 flex items-center gap-1">
-            <Clock size={12} /> Settles at 11:59 PM tonight
-          </p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-3xl">
+            <p className="text-zinc-500 text-xs font-black uppercase tracking-widest mb-2">Pending Earnings</p>
+            <p className="text-3xl font-black">₦{pending.toLocaleString()}</p>
+            <p className="text-zinc-500 text-xs mt-4 flex items-center gap-1">
+              <Clock size={12} /> Settles at 11:59 PM tonight
+            </p>
+          </div>
+          <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-3xl md:col-span-2">
+            <div className="flex justify-between items-end mb-4">
+              <div>
+                <p className="text-zinc-500 text-xs font-black uppercase tracking-widest mb-1">Payout Threshold Progress</p>
+                <p className="text-xl font-black">₦{balance.toLocaleString()} / ₦{threshold.toLocaleString()}</p>
+              </div>
+              <span className="text-xs font-black text-zinc-500">{Math.round(progress)}%</span>
+            </div>
+            <div className="h-4 bg-zinc-800 rounded-full overflow-hidden border border-zinc-700">
+              <motion.div 
+                initial={{ width: 0 }}
+                animate={{ width: `${progress}%` }}
+                className={`h-full transition-colors ${isThresholdReached ? 'bg-emerald-400' : 'bg-yellow-400'}`}
+              />
+            </div>
+            <p className="text-zinc-500 text-[10px] mt-4 uppercase tracking-widest font-bold">
+              Minimum payout threshold is required to prevent high transaction fees.
+            </p>
+          </div>
         </div>
+
         <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-3xl">
           <p className="text-zinc-500 text-xs font-black uppercase tracking-widest mb-2">Total Paid Out</p>
           <p className="text-3xl font-black">₦{(stats?.totalPaid || 0).toLocaleString()}</p>
@@ -579,8 +661,8 @@ export const DriverPortal = () => {
           </p>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderHistory = () => (
     <div className="space-y-8">
@@ -648,7 +730,12 @@ export const DriverPortal = () => {
               <label className="text-xs font-black text-zinc-500 uppercase tracking-widest mb-2 block">Email Address</label>
               <input type="email" defaultValue="driver@example.com" className="w-full bg-zinc-800 border-none rounded-xl p-3 text-sm font-bold" />
             </div>
-            <button className="bg-yellow-400 text-black px-6 py-3 rounded-xl font-black text-sm">Save Changes</button>
+            <button 
+              onClick={() => alert('Profile changes saved successfully!')}
+              className="bg-yellow-400 text-black px-6 py-3 rounded-xl font-black text-sm hover:scale-[1.02] transition-transform"
+            >
+              Save Changes
+            </button>
           </div>
         </div>
 
@@ -665,9 +752,17 @@ export const DriverPortal = () => {
                   <p className="text-zinc-500 text-xs">8123456789 • Emeka N.</p>
                 </div>
               </div>
-              <button className="text-yellow-400 font-bold text-sm">Edit</button>
+              <button 
+                onClick={() => alert('Bank details editing is currently disabled in demo mode.')}
+                className="text-yellow-400 font-bold text-sm hover:underline"
+              >
+                Edit
+              </button>
             </div>
-            <button className="w-full py-4 border-2 border-dashed border-zinc-800 rounded-2xl text-zinc-500 font-bold hover:border-yellow-400/50 hover:text-yellow-400 transition-all">
+            <button 
+              onClick={() => alert('Bank account addition is currently disabled in demo mode.')}
+              className="w-full py-4 border-2 border-dashed border-zinc-800 rounded-2xl text-zinc-500 font-bold hover:border-yellow-400/50 hover:text-yellow-400 transition-all"
+            >
               + Add New Bank Account
             </button>
           </div>
@@ -823,7 +918,15 @@ export const DriverPortal = () => {
                       className="w-full bg-zinc-800 border-none rounded-2xl p-6 pl-12 text-3xl font-black focus:ring-2 focus:ring-yellow-400"
                     />
                   </div>
-                  <p className="text-xs text-zinc-500 mt-3">Available: ₦{(stats?.balance || 0).toLocaleString()}</p>
+                  <div className="flex justify-between mt-3">
+                    <p className="text-xs text-zinc-500">Available: ₦{(stats?.balance || 0).toLocaleString()}</p>
+                    <p className="text-xs text-zinc-500">Min: ₦{(stats?.minPayoutThreshold || 5000).toLocaleString()}</p>
+                  </div>
+                  {parseFloat(withdrawAmount) < (stats?.minPayoutThreshold || 5000) && withdrawAmount !== '' && (
+                    <p className="text-red-400 text-[10px] font-bold uppercase tracking-widest mt-2 flex items-center gap-1">
+                      <AlertCircle size={10} /> Amount below minimum threshold
+                    </p>
+                  )}
                 </div>
 
                 <div>

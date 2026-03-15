@@ -218,8 +218,8 @@ const AdminDashboard: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="bg-[#1A1A1A] border border-white/5 p-6 rounded-2xl">
             <h3 className="text-lg font-semibold text-white mb-6">Revenue Trend (30 Days)</h3>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="h-[300px] w-full">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                 <AreaChart data={stats.revenueTrend}>
                   <defs>
                     <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
@@ -254,8 +254,8 @@ const AdminDashboard: React.FC = () => {
 
           <div className="bg-[#1A1A1A] border border-white/5 p-6 rounded-2xl">
             <h3 className="text-lg font-semibold text-white mb-6">Active Screens per Route</h3>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="h-[300px] w-full">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                 <BarChart data={stats.routePerformance} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" stroke="#333" horizontal={false} />
                   <XAxis type="number" stroke="#666" fontSize={12} />

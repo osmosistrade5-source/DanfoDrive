@@ -834,6 +834,14 @@ export const DriverPortal = () => {
         {/* Header */}
         <header className="h-20 bg-black/80 backdrop-blur-md border-b border-zinc-900 flex items-center justify-between px-8 sticky top-0 z-40">
           <div className="flex items-center gap-4">
+            {activeTab !== 'overview' && (
+              <button 
+                onClick={() => setActiveTab('overview')}
+                className="p-2 hover:bg-zinc-800 rounded-full transition-colors text-zinc-400 hover:text-white"
+              >
+                <ChevronRight className="rotate-180" size={24} />
+              </button>
+            )}
             <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="hidden lg:block text-zinc-500 hover:text-white">
               <Menu size={24} />
             </button>

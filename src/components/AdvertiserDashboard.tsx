@@ -5,7 +5,7 @@ import {
   TrendingUp, ArrowUpRight, ShieldCheck, CreditCard, Zap,
   BarChart3, Settings, LogOut, Bell, Search, Filter,
   Play, Pause, Edit3, Trash2, CheckCircle2, AlertCircle,
-  Truck, Users, Timer, DollarSign, Lock, Activity, Map, Info
+  Truck, Users, Timer, DollarSign, Lock, Activity, Map, Info, X
 } from 'lucide-react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, 
@@ -43,7 +43,7 @@ const routeData = [
 
 // --- Sub-Components ---
 
-const CreateCampaignFlow = ({ setActiveTab, wallet, routes, onRefresh, initialRouteId }: any) => {
+const CreateCampaignFlow = ({ setActiveTab, wallet, routes, onRefresh, initialRouteId, setShowDepositModal }: any) => {
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     name: '',
@@ -220,7 +220,10 @@ const CreateCampaignFlow = ({ setActiveTab, wallet, routes, onRefresh, initialRo
                 <div className="p-8 bg-zinc-800/50 rounded-3xl border border-zinc-800">
                   <p className="text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Available Balance</p>
                   <p className="text-4xl font-black">₦{(wallet?.balance || 0).toLocaleString()}</p>
-                  <button className="mt-6 w-full py-3 bg-white text-black rounded-xl font-black text-sm hover:bg-yellow-400 transition-colors">
+                  <button 
+                    onClick={() => setShowDepositModal(true)}
+                    className="mt-6 w-full py-3 bg-white text-black rounded-xl font-black text-sm hover:bg-yellow-400 transition-colors"
+                  >
                     Deposit Funds
                   </button>
                 </div>
@@ -560,10 +563,10 @@ const SmartRoutes = ({ routes, selectedRoute, setSelectedRoute, setActiveTab, se
     // Mock density logic based on time of day
     let density = r.current_density;
     if (filterTime === 'Morning Peak') {
-      if (r.name?.includes('Ikeja') || r.name?.includes('Oshodi') || r.name?.includes('Gwarinpa')) density = 'high';
+      if (r.name?.includes('Ikeja') || r.name?.includes('Oshodi') || r.name?.includes('Gwarinpa') || r.name?.includes('Aba Road') || r.name?.includes('Ring Road') || r.name?.includes('Asaba')) density = 'high';
       else density = 'medium';
     } else if (filterTime === 'Evening Peak') {
-      if (r.name?.includes('CMS') || r.name?.includes('Lekki') || r.name?.includes('Maitama')) density = 'high';
+      if (r.name?.includes('CMS') || r.name?.includes('Lekki') || r.name?.includes('Maitama') || r.name?.includes('Mile 1') || r.name?.includes('UNIBEN') || r.name?.includes('Onitsha')) density = 'high';
       else density = 'medium';
     } else if (filterTime === 'Off-Peak') {
       density = 'low';
@@ -587,6 +590,10 @@ const SmartRoutes = ({ routes, selectedRoute, setSelectedRoute, setActiveTab, se
             <option>All Cities</option>
             <option>Lagos</option>
             <option>Abuja</option>
+            <option>Port Harcourt</option>
+            <option>Benin City</option>
+            <option>Asaba</option>
+            <option>Warri</option>
           </select>
           <select 
             value={filterType}
@@ -724,6 +731,11 @@ export const AdvertiserDashboard = () => {
   const [topDrivers, setTopDrivers] = useState<any[]>([]);
   const [wallet, setWallet] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [showDepositModal, setShowDepositModal] = useState(false);
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+  const [depositAmount, setDepositAmount] = useState('10000');
+  const [isDepositing, setIsDepositing] = useState(false);
+  const [isChangingPlan, setIsChangingPlan] = useState(false);
 
   const fetchStats = async () => {
     try {
@@ -747,6 +759,51 @@ export const AdvertiserDashboard = () => {
       console.error("Failed to fetch dashboard data", err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeposit = async () => {
+    setIsDepositing(true);
+    try {
+      const res = await fetch('/api/wallet/deposit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: 1, amount: Number(depositAmount) })
+      });
+      if (res.ok) {
+        await fetchStats();
+        setShowDepositModal(false);
+      } else {
+        alert("Failed to deposit funds");
+      }
+    } catch (error) {
+      console.error("Deposit error:", error);
+      alert("An error occurred during deposit");
+    } finally {
+      setIsDepositing(false);
+    }
+  };
+
+  const handleSubscriptionChange = async (tier: string, amount: number) => {
+    setIsChangingPlan(true);
+    try {
+      const res = await fetch('/api/subscription/pay', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: 1, tier, amount })
+      });
+      if (res.ok) {
+        await fetchStats();
+        setShowSubscriptionModal(false);
+      } else {
+        const err = await res.json();
+        alert(err.error || "Failed to change plan");
+      }
+    } catch (error) {
+      console.error("Subscription error:", error);
+      alert("An error occurred while changing plan");
+    } finally {
+      setIsChangingPlan(false);
     }
   };
 
@@ -1024,11 +1081,14 @@ export const AdvertiserDashboard = () => {
               </div>
             </div>
             <div className="flex gap-4 mt-10">
-              <button className="bg-yellow-400 text-black px-8 py-4 rounded-2xl font-black text-lg flex items-center gap-2 hover:scale-105 transition-transform">
+              <button 
+                onClick={() => setShowDepositModal(true)}
+                className="bg-yellow-400 text-black px-8 py-4 rounded-2xl font-black text-lg flex items-center gap-2 hover:scale-105 transition-transform"
+              >
                 <Plus size={20} /> Deposit Funds
               </button>
               <button 
-                onClick={() => setActiveTab('create')}
+                onClick={() => setShowSubscriptionModal(true)}
                 className="bg-zinc-800 text-white px-8 py-4 rounded-2xl font-black text-lg hover:bg-zinc-700 transition-colors"
               >
                 {wallet?.subscription_tier === 'none' ? 'Upgrade Plan' : 'Manage Subscription'}
@@ -1087,7 +1147,10 @@ export const AdvertiserDashboard = () => {
             </div>
             <p className="text-zinc-400 text-xs leading-relaxed">Up to 100 drivers, route targeting, and advanced analytics included.</p>
           </div>
-          <button className="w-full py-3 bg-zinc-800 hover:bg-zinc-700 rounded-xl font-bold text-sm transition-colors">
+          <button 
+            onClick={() => setShowSubscriptionModal(true)}
+            className="w-full py-3 bg-zinc-800 hover:bg-zinc-700 rounded-xl font-bold text-sm transition-colors"
+          >
             Upgrade Plan
           </button>
         </div>
@@ -1171,6 +1234,14 @@ export const AdvertiserDashboard = () => {
         {/* Topbar */}
         <header className="h-20 border-b border-zinc-800 flex items-center justify-between px-10 bg-black/50 backdrop-blur-xl z-10">
           <div className="flex items-center gap-4">
+            {activeTab !== 'overview' && (
+              <button 
+                onClick={() => setActiveTab('overview')}
+                className="p-2 hover:bg-zinc-800 rounded-full transition-colors text-zinc-400 hover:text-white"
+              >
+                <ChevronRight className="rotate-180" size={24} />
+              </button>
+            )}
             <h1 className="text-xl font-black tracking-tight capitalize">{activeTab.replace('-', ' ')}</h1>
             <div className="h-4 w-px bg-zinc-800 mx-2" />
             <div className="flex items-center gap-2 text-xs font-bold text-zinc-500">
@@ -1225,6 +1296,7 @@ export const AdvertiserDashboard = () => {
                   routes={routes} 
                   onRefresh={fetchStats}
                   initialRouteId={initialRouteId}
+                  setShowDepositModal={setShowDepositModal}
                 />}
                 {activeTab === 'wallet' && renderWallet()}
                 {activeTab === 'analytics' && renderOverview()} {/* Reusing overview for demo */}
@@ -1233,6 +1305,138 @@ export const AdvertiserDashboard = () => {
           </AnimatePresence>
         </div>
       </main>
+
+      {/* Deposit Modal */}
+      <AnimatePresence>
+        {showDepositModal && (
+          <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-zinc-900 w-full max-w-md rounded-[2.5rem] p-10 border border-zinc-800"
+            >
+              <div className="flex justify-between items-center mb-8">
+                <h2 className="text-2xl font-black">Deposit Funds</h2>
+                <button onClick={() => setShowDepositModal(false)} className="text-zinc-500 hover:text-white">
+                  <X size={24} />
+                </button>
+              </div>
+              
+              <div className="space-y-8">
+                <div>
+                  <label className="text-xs font-black text-zinc-500 uppercase tracking-widest mb-3 block">Amount to Deposit (₦)</label>
+                  <div className="relative">
+                    <span className="absolute left-6 top-1/2 -translate-y-1/2 text-2xl font-black text-zinc-500">₦</span>
+                    <input 
+                      type="number" 
+                      value={depositAmount}
+                      onChange={(e) => setDepositAmount(e.target.value)}
+                      className="w-full bg-zinc-800 border-none rounded-2xl p-6 pl-12 text-3xl font-black focus:ring-2 focus:ring-yellow-400"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-4 space-y-4">
+                  <button 
+                    onClick={handleDeposit}
+                    disabled={isDepositing || !depositAmount}
+                    className="w-full bg-yellow-400 text-black py-5 rounded-2xl font-black text-lg shadow-lg shadow-yellow-400/10 hover:scale-[1.02] transition-transform disabled:opacity-50"
+                  >
+                    {isDepositing ? 'Processing...' : 'Confirm Deposit'}
+                  </button>
+                  <p className="text-center text-[10px] text-zinc-500 uppercase font-black tracking-widest">
+                    Secure payment via Paystack/Flutterwave
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Subscription Modal */}
+      <AnimatePresence>
+        {showSubscriptionModal && (
+          <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-zinc-900 w-full max-w-4xl rounded-[3rem] p-12 border border-zinc-800 overflow-y-auto max-h-[90vh]"
+            >
+              <div className="flex justify-between items-center mb-12">
+                <div>
+                  <h2 className="text-4xl font-black tracking-tighter mb-2">Manage Subscription</h2>
+                  <p className="text-zinc-500 font-medium">Current Plan: <span className="text-yellow-400 uppercase font-black tracking-widest">{wallet?.subscription_tier}</span></p>
+                </div>
+                <button onClick={() => setShowSubscriptionModal(false)} className="p-3 bg-zinc-800 rounded-2xl text-zinc-500 hover:text-white transition-colors">
+                  <X size={24} />
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                {[
+                  { id: 'starter', name: 'Starter', price: 50000, drivers: 20, color: 'zinc' },
+                  { id: 'growth', name: 'Growth', price: 150000, drivers: 100, color: 'yellow' },
+                  { id: 'enterprise', name: 'Enterprise', price: 500000, drivers: 'Unlimited', color: 'emerald' }
+                ].map((plan) => (
+                  <div key={plan.id} className={`bg-zinc-800/50 border ${wallet?.subscription_tier === plan.id ? 'border-yellow-400' : 'border-zinc-800'} rounded-[2.5rem] p-8 flex flex-col relative`}>
+                    {wallet?.subscription_tier === plan.id && (
+                      <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-yellow-400 text-black px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">
+                        Current Plan
+                      </div>
+                    )}
+                    <h3 className="text-xl font-black mb-1">{plan.name}</h3>
+                    <div className="flex items-baseline gap-1 mb-6">
+                      <span className="text-3xl font-black">₦{plan.price.toLocaleString()}</span>
+                      <span className="text-zinc-500 text-xs font-bold">/mo</span>
+                    </div>
+                    
+                    <ul className="space-y-3 mb-8 flex-1">
+                      <li className="flex items-center gap-2 text-xs font-bold text-zinc-400">
+                        <CheckCircle2 size={14} className="text-emerald-400" />
+                        Up to {plan.drivers} drivers
+                      </li>
+                      <li className="flex items-center gap-2 text-xs font-bold text-zinc-400">
+                        <CheckCircle2 size={14} className="text-emerald-400" />
+                        Route Targeting
+                      </li>
+                      <li className="flex items-center gap-2 text-xs font-bold text-zinc-400">
+                        <CheckCircle2 size={14} className="text-emerald-400" />
+                        Real-time Analytics
+                      </li>
+                    </ul>
+
+                    <button 
+                      onClick={() => handleSubscriptionChange(plan.id, plan.price)}
+                      disabled={isChangingPlan || wallet?.subscription_tier === plan.id || (wallet?.balance || 0) < plan.price}
+                      className={`w-full py-4 rounded-2xl font-black text-sm transition-all ${
+                        plan.id === 'growth' ? 'bg-yellow-400 text-black' : 'bg-zinc-700 text-white hover:bg-zinc-600'
+                      } disabled:opacity-50 disabled:cursor-not-allowed`}
+                    >
+                      {isChangingPlan ? 'Processing...' : wallet?.subscription_tier === plan.id ? 'Active' : (wallet?.balance || 0) < plan.price ? 'Insufficient Balance' : 'Switch Plan'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+              
+              <div className="mt-12 p-6 bg-zinc-800/30 rounded-3xl border border-zinc-800 flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-zinc-800 rounded-2xl text-zinc-500">
+                    <Info size={24} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold">Billing Cycle</p>
+                    <p className="text-xs text-zinc-500">Your next billing date is April 16, 2026</p>
+                  </div>
+                </div>
+                <button className="text-sm font-bold text-red-400 hover:underline">Cancel Subscription</button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

@@ -29,7 +29,8 @@ import {
   Navigation,
   Plus,
   Info,
-  Shield
+  Shield,
+  LogOut
 } from 'lucide-react';
 import { 
   LineChart, 
@@ -49,6 +50,7 @@ import {
 } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
 import { Map, AdvancedMarker, Pin, useMap } from '@vis.gl/react-google-maps';
+import api from '../services/api';
 
 // --- Admin Map Component ---
 const AdminMap = ({ drivers }: { drivers: any[] }) => {
@@ -158,7 +160,7 @@ const StatCard = ({ title, value, icon: Icon, trend, color }: any) => (
   </div>
 );
 
-const AdminDashboard: React.FC = () => {
+const AdminDashboard: React.FC<{ onLogout?: () => void }> = ({ onLogout }) => {
   const [activeTab, setActiveTab] = useState('overview');
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [advertisers, setAdvertisers] = useState<Advertiser[]>([]);
@@ -176,18 +178,18 @@ const AdminDashboard: React.FC = () => {
     setLoading(true);
     try {
       const [statsRes, adsRes, driversRes, campaignsRes, notifsRes] = await Promise.all([
-        fetch('/api/admin/overview'),
-        fetch('/api/admin/advertisers'),
-        fetch('/api/admin/drivers'),
-        fetch('/api/admin/campaigns'),
-        fetch('/api/admin/notifications')
+        api.get('/api/admin/overview'),
+        api.get('/api/admin/advertisers'),
+        api.get('/api/admin/drivers'),
+        api.get('/api/admin/campaigns'),
+        api.get('/api/admin/notifications')
       ]);
 
-      setStats(await statsRes.json());
-      setAdvertisers(await adsRes.json());
-      setDrivers(await driversRes.json());
-      setCampaigns(await campaignsRes.json());
-      setNotifications(await notifsRes.json());
+      setStats(statsRes.data);
+      setAdvertisers(adsRes.data);
+      setDrivers(driversRes.data);
+      setCampaigns(campaignsRes.data);
+      setNotifications(notifsRes.data);
     } catch (error) {
       console.error('Error fetching admin data:', error);
     } finally {
@@ -197,11 +199,7 @@ const AdminDashboard: React.FC = () => {
 
   const updateStatus = async (type: 'users' | 'campaigns', id: number, status: string) => {
     try {
-      await fetch(`/api/admin/${type}/${id}/status`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status })
-      });
+      await api.post(`/api/admin/${type}/${id}/status`, { status });
       fetchData();
     } catch (error) {
       console.error(`Error updating ${type} status:`, error);
@@ -961,6 +959,13 @@ const AdminDashboard: React.FC = () => {
               <div className="text-white text-sm font-medium truncate">Super Admin</div>
               <div className="text-white/30 text-[10px] truncate">admin@danfodrive.com</div>
             </div>
+            <button
+              onClick={onLogout}
+              className="p-2 text-white/30 hover:text-rose-500 transition-colors"
+              title="Logout"
+            >
+              <LogOut size={18} />
+            </button>
           </div>
         </div>
       </div>

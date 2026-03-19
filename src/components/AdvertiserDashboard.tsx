@@ -7,6 +7,7 @@ import {
   Play, Pause, Edit3, Trash2, CheckCircle2, AlertCircle,
   Truck, Users, Timer, DollarSign, Lock, Activity, Map as MapIcon, Info, X
 } from 'lucide-react';
+import api from '../services/api';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, 
   Tooltip, ResponsiveContainer, BarChart, Bar, Cell
@@ -697,7 +698,7 @@ const StatCard = ({ label, value, icon: Icon, trend, color = "yellow" }: any) =>
   </div>
 );
 
-export const AdvertiserDashboard = () => {
+export const AdvertiserDashboard = ({ onLogout }: { onLogout: () => void }) => {
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedRoute, setSelectedRoute] = useState<any>(null);
   const [initialRouteId, setInitialRouteId] = useState<string | null>(null);
@@ -713,24 +714,22 @@ export const AdvertiserDashboard = () => {
   const [isDepositing, setIsDepositing] = useState(false);
   const [isChangingPlan, setIsChangingPlan] = useState(false);
 
+  const user = JSON.parse(localStorage.getItem('danfodrive_user') || '{}');
+
   const fetchStats = async () => {
     try {
-      const [statsRes, campaignsRes, routesRes, walletRes, topDriversRes] = await Promise.all([
-        fetch('/api/advertiser/stats/1'),
-        fetch('/api/campaigns'),
-        fetch('/api/routes'),
-        fetch('/api/wallet/stats/1'),
-        fetch('/api/advertiser/top-drivers')
+      const [statsRes, campaignsRes, routesRes, topDriversRes] = await Promise.all([
+        api.get(`/advertiser/stats/${user.id}`),
+        api.get('/campaigns'),
+        api.get('/routes'),
+        api.get('/advertiser/top-drivers')
       ]);
       
-      const statsData = await statsRes.json();
-      const walletData = await walletRes.json();
-      
-      setStats(statsData);
-      setCampaigns(await campaignsRes.json());
-      setRoutes(await routesRes.json());
-      setTopDrivers(await topDriversRes.json());
-      setWallet({ ...walletData, subscription_tier: statsData.subscription_tier });
+      setStats(statsRes.data);
+      setCampaigns(campaignsRes.data);
+      setRoutes(routesRes.data);
+      setTopDrivers(topDriversRes.data);
+      setWallet({ balance: statsRes.data.wallet_balance, subscription_tier: statsRes.data.subscription_tier, transactions: [] });
     } catch (err) {
       console.error("Failed to fetch dashboard data", err);
     } finally {
@@ -741,20 +740,12 @@ export const AdvertiserDashboard = () => {
   const handleDeposit = async () => {
     setIsDepositing(true);
     try {
-      const res = await fetch('/api/wallet/deposit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: 1, amount: Number(depositAmount) })
-      });
-      if (res.ok) {
-        await fetchStats();
-        setShowDepositModal(false);
-      } else {
-        alert("Failed to deposit funds");
-      }
-    } catch (error) {
+      await api.post('/api/wallet/deposit', { amount: Number(depositAmount) });
+      await fetchStats();
+      setShowDepositModal(false);
+    } catch (error: any) {
       console.error("Deposit error:", error);
-      alert("An error occurred during deposit");
+      alert(error.response?.data?.error || "An error occurred during deposit");
     } finally {
       setIsDepositing(false);
     }
@@ -763,21 +754,12 @@ export const AdvertiserDashboard = () => {
   const handleSubscriptionChange = async (tier: string, amount: number) => {
     setIsChangingPlan(true);
     try {
-      const res = await fetch('/api/subscription/pay', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: 1, tier, amount })
-      });
-      if (res.ok) {
-        await fetchStats();
-        setShowSubscriptionModal(false);
-      } else {
-        const err = await res.json();
-        alert(err.error || "Failed to change plan");
-      }
-    } catch (error) {
+      await api.post('/api/subscription/pay', { tier, amount });
+      await fetchStats();
+      setShowSubscriptionModal(false);
+    } catch (error: any) {
       console.error("Subscription error:", error);
-      alert("An error occurred while changing plan");
+      alert(error.response?.data?.error || "An error occurred while changing plan");
     } finally {
       setIsChangingPlan(false);
     }
@@ -1199,7 +1181,10 @@ export const AdvertiserDashboard = () => {
               <p className="text-[10px] text-zinc-500 uppercase font-black tracking-widest">Growth Plan</p>
             </div>
           </div>
-          <button className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold text-zinc-500 hover:text-red-400 hover:bg-red-400/5 transition-all">
+          <button 
+            onClick={onLogout}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold text-zinc-500 hover:text-red-400 hover:bg-red-400/5 transition-all"
+          >
             <LogOut size={20} /> Sign Out
           </button>
         </div>

@@ -14,6 +14,7 @@ import {
 } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
 import { Map, AdvancedMarker, Pin, useMap } from '@vis.gl/react-google-maps';
+import api from '../services/api';
 
 // --- Mock Data ---
 const earningsTrendData = [
@@ -69,7 +70,7 @@ const StatCard = ({ label, value, icon: Icon, trend, color = "yellow", onClick }
 
 const DRIVER_ID = 2;
 
-export const DriverPortal = () => {
+export const DriverPortal = ({ onLogout }: { onLogout?: () => void }) => {
   const [activeTab, setActiveTab] = useState('overview');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [stats, setStats] = useState<any>(null);
@@ -86,22 +87,22 @@ export const DriverPortal = () => {
   const fetchDriverData = async () => {
     try {
       const [statsRes, requestsRes, activeRes, earningsRes, payoutsRes, devicesRes, performanceRes] = await Promise.all([
-        fetch(`/api/driver/stats/${DRIVER_ID}`),
-        fetch(`/api/driver/campaign-requests/${DRIVER_ID}`),
-        fetch(`/api/driver/active-campaigns/${DRIVER_ID}`),
-        fetch(`/api/driver/earnings-history/${DRIVER_ID}`),
-        fetch(`/api/driver/payout-history/${DRIVER_ID}`),
-        fetch(`/api/driver/devices/${DRIVER_ID}`),
-        fetch(`/api/driver/performance/${DRIVER_ID}`)
+        api.get(`/api/driver/stats/${DRIVER_ID}`),
+        api.get(`/api/driver/campaign-requests/${DRIVER_ID}`),
+        api.get(`/api/driver/active-campaigns/${DRIVER_ID}`),
+        api.get(`/api/driver/earnings-history/${DRIVER_ID}`),
+        api.get(`/api/driver/payout-history/${DRIVER_ID}`),
+        api.get(`/api/driver/devices/${DRIVER_ID}`),
+        api.get(`/api/driver/performance/${DRIVER_ID}`)
       ]);
 
-      setStats(await statsRes.json());
-      setRequests(await requestsRes.json());
-      setActiveCampaigns(await activeRes.json());
-      setEarningsHistory(await earningsRes.json());
-      setPayoutHistory(await payoutsRes.json());
-      setDevices(await devicesRes.json());
-      const perfData = await performanceRes.json();
+      setStats(statsRes.data);
+      setRequests(requestsRes.data);
+      setActiveCampaigns(activeRes.data);
+      setEarningsHistory(earningsRes.data);
+      setPayoutHistory(payoutsRes.data);
+      setDevices(devicesRes.data);
+      const perfData = performanceRes.data;
       setPerformance(perfData.performance);
       setPerformanceHistory(perfData.history);
     } catch (err) {
@@ -117,12 +118,8 @@ export const DriverPortal = () => {
 
   const handleAcceptCampaign = async (campaignId: number) => {
     try {
-      const res = await fetch('/api/driver/accept-campaign', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: DRIVER_ID, campaignId })
-      });
-      if (res.ok) fetchDriverData();
+      await api.post('/api/driver/accept-campaign', { campaignId });
+      fetchDriverData();
     } catch (err) {
       console.error("Failed to accept campaign", err);
     }
@@ -842,7 +839,10 @@ export const DriverPortal = () => {
               <p className="text-xs text-zinc-500">Verified Driver</p>
             </div>
           </div>
-          <button className="w-full flex items-center gap-3 px-4 py-3 text-zinc-500 font-bold hover:text-red-400 transition-colors">
+          <button 
+            onClick={onLogout}
+            className="w-full flex items-center gap-3 px-4 py-3 text-zinc-500 font-bold hover:text-red-400 transition-colors"
+          >
             <LogOut size={20} />
             <span>Logout</span>
           </button>

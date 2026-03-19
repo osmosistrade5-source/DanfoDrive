@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import api from './services/api';
 import { LandingPage } from './components/LandingPage';
 import { AdvertiserDashboard } from './components/AdvertiserDashboard';
 import { DriverPortal } from './components/DriverPortal';
@@ -32,10 +33,19 @@ interface Device {
 }
 
 // --- Protected Route Wrapper ---
-const ProtectedRoute = ({ children, role, userRole }: { children: React.ReactNode, role: string, userRole: string }) => {
-  // In this demo, we'll allow the transition to happen smoothly.
-  // The role switcher handles the state, so we don't need to force a redirect here
-  // which causes race conditions during navigation.
+const ProtectedRoute = ({ children, role }: { children: React.ReactNode, role: string }) => {
+  const token = localStorage.getItem('danfodrive_token');
+  const userStr = localStorage.getItem('danfodrive_user');
+  const user = userStr ? JSON.parse(userStr) : null;
+
+  if (!token || !user) {
+    return <Navigate to="/" replace />;
+  }
+
+  if (role !== 'any' && user.role !== role && user.role !== 'admin') {
+    return <Navigate to="/" replace />;
+  }
+
   return <>{children}</>;
 };
 
@@ -48,11 +58,15 @@ const AdPlayer = ({ onBack }: { onBack: () => void }) => {
 
   useEffect(() => {
     const fetchAd = async () => {
-      const res = await fetch(`/api/ads/active?lat=${location.lat}&lng=${location.lng}`);
-      const ads = await res.json();
-      if (ads.length > 0) {
-        const selected = ads[Math.floor(Math.random() * ads.length)];
-        setCurrentAd(selected);
+      try {
+        const res = await api.get(`/api/ads/active?lat=${location.lat}&lng=${location.lng}`);
+        const ads = res.data;
+        if (ads.length > 0) {
+          const selected = ads[Math.floor(Math.random() * ads.length)];
+          setCurrentAd(selected);
+        }
+      } catch (err) {
+        console.error("Failed to fetch ad", err);
       }
     };
     fetchAd();
@@ -66,16 +80,12 @@ const AdPlayer = ({ onBack }: { onBack: () => void }) => {
       const logImpression = async () => {
         setIsLogging(true);
         try {
-          await fetch('/api/impressions/log', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              deviceId: 'DF-2026-001', // Mock device ID
-              adId: currentAd.id,
-              lat: location.lat,
-              lng: location.lng,
-              speed: speed
-            })
+          await api.post('/api/impressions/log', {
+            deviceId: 'DF-2026-001', // Mock device ID
+            adId: currentAd.id,
+            lat: location.lat,
+            lng: location.lng,
+            speed: speed
           });
         } catch (err) {
           console.error("Failed to log impression", err);
@@ -215,26 +225,40 @@ const API_KEY =
 const hasValidKey = Boolean(API_KEY) && API_KEY !== 'YOUR_API_KEY';
 
 export default function App() {
-  const [userRole, setUserRole] = useState<'guest' | 'advertiser' | 'driver' | 'admin'>('guest');
+  const [user, setUser] = useState<any>(null);
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Sync role with path on load/navigation
   useEffect(() => {
-    const path = location.pathname;
-    if (path === '/admin') setUserRole('admin');
-    else if (path === '/advertiser') setUserRole('advertiser');
-    else if (path === '/driver') setUserRole('driver');
-    else if (path === '/') setUserRole('guest');
-  }, [location.pathname]);
+    const storedUser = localStorage.getItem('danfodrive_user');
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+  }, []);
 
-  // Simple demo logic: set role based on path or button click
-  const handleRoleChange = (role: any) => {
-    setUserRole(role);
-    if (role === 'admin') navigate('/admin');
-    else if (role === 'advertiser') navigate('/advertiser');
-    else if (role === 'driver') navigate('/driver');
-    else navigate('/');
+  const handleLogin = async (email: string, role: string) => {
+    try {
+      const response = await api.post('/auth/login', { email, password: 'password', role });
+      const { token, user } = response.data;
+      
+      localStorage.setItem('danfodrive_token', token);
+      localStorage.setItem('danfodrive_user', JSON.stringify(user));
+      setUser(user);
+
+      if (user.role === 'admin') navigate('/admin');
+      else if (user.role === 'advertiser') navigate('/advertiser');
+      else if (user.role === 'driver') navigate('/driver');
+    } catch (error) {
+      console.error('Login failed:', error);
+      alert('Login failed. Please try again.');
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('danfodrive_token');
+    localStorage.removeItem('danfodrive_user');
+    setUser(null);
+    navigate('/');
   };
 
   if (!hasValidKey && location.pathname !== '/') {
@@ -282,28 +306,28 @@ export default function App() {
     <APIProvider apiKey={API_KEY} version="weekly">
       <div className="min-h-screen bg-black">
         <Routes>
-          <Route path="/" element={<LandingPage onGetStarted={(role) => handleRoleChange(role)} />} />
+          <Route path="/" element={<LandingPage onGetStarted={(role) => handleLogin(`${role}@example.com`, role)} />} />
           <Route 
             path="/advertiser" 
             element={
-              <ProtectedRoute role="advertiser" userRole={userRole}>
-                <AdvertiserDashboard />
+              <ProtectedRoute role="advertiser">
+                <AdvertiserDashboard onLogout={handleLogout} />
               </ProtectedRoute>
             } 
           />
           <Route 
             path="/driver" 
             element={
-              <ProtectedRoute role="driver" userRole={userRole}>
-                <DriverPortal />
+              <ProtectedRoute role="driver">
+                <DriverPortal onLogout={handleLogout} />
               </ProtectedRoute>
             } 
           />
           <Route 
             path="/admin" 
             element={
-              <ProtectedRoute role="admin" userRole={userRole}>
-                <AdminDashboard />
+              <ProtectedRoute role="admin">
+                <AdminDashboard onLogout={handleLogout} />
               </ProtectedRoute>
             } 
           />
@@ -313,29 +337,34 @@ export default function App() {
         {/* Demo Role Switcher (Floating) */}
         <div className="fixed bottom-8 right-8 z-[200] flex gap-2 p-2 bg-zinc-900/80 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl">
           <button 
-            onClick={() => handleRoleChange('guest')}
+            onClick={() => navigate('/')}
             className={`p-2 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-colors ${location.pathname === '/' ? 'bg-yellow-400 text-black' : 'text-zinc-500 hover:text-white'}`}
           >
             Home
           </button>
-          <button 
-            onClick={() => handleRoleChange('advertiser')}
-            className={`p-2 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-colors ${location.pathname === '/advertiser' ? 'bg-yellow-400 text-black' : 'text-zinc-500 hover:text-white'}`}
-          >
-            Ads
-          </button>
-          <button 
-            onClick={() => handleRoleChange('driver')}
-            className={`p-2 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-colors ${location.pathname === '/driver' ? 'bg-yellow-400 text-black' : 'text-zinc-500 hover:text-white'}`}
-          >
-            Driver
-          </button>
-          <button 
-            onClick={() => handleRoleChange('admin')}
-            className={`p-2 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-colors ${location.pathname === '/admin' ? 'bg-yellow-400 text-black' : 'text-zinc-500 hover:text-white'}`}
-          >
-            Admin
-          </button>
+          {!user ? (
+            <>
+              <button 
+                onClick={() => handleLogin('advertiser@example.com', 'advertiser')}
+                className="p-2 rounded-lg text-[10px] font-black uppercase tracking-tighter text-zinc-500 hover:text-white"
+              >
+                Login Ads
+              </button>
+              <button 
+                onClick={() => handleLogin('driver@example.com', 'driver')}
+                className="p-2 rounded-lg text-[10px] font-black uppercase tracking-tighter text-zinc-500 hover:text-white"
+              >
+                Login Driver
+              </button>
+            </>
+          ) : (
+            <button 
+              onClick={handleLogout}
+              className="p-2 rounded-lg text-[10px] font-black uppercase tracking-tighter text-zinc-500 hover:text-red-400"
+            >
+              Logout
+            </button>
+          )}
           <button 
             onClick={() => navigate('/player')}
             className={`p-2 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-colors ${location.pathname === '/player' ? 'bg-yellow-400 text-black' : 'text-zinc-500 hover:text-white'}`}

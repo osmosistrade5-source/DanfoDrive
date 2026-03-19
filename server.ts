@@ -56,12 +56,58 @@ io.on('connection', (socket) => {
 // --- API Routes ---
 
 // Auth Routes (Public)
+app.post('/api/auth/register', async (req, res) => {
+  const { email, password, role, name } = req.body;
+  try {
+    // Check if user exists
+    const { data: existingUser } = await db.users().select('id').eq('email', email).single();
+    if (existingUser) return res.status(400).json({ error: 'User already exists' });
+
+    // Create user in DB
+    const { data: newUser, error } = await db.users().insert({
+      email,
+      password, // In real app, hash this!
+      role: role || 'advertiser',
+      name,
+      subscription_tier: 'free'
+    }).select().single();
+
+    if (error) throw error;
+
+    // Create wallet for user
+    await db.wallets().insert({ user_id: newUser.id, balance: 0 });
+
+    const token = jwt.sign({ id: newUser.id, email: newUser.email, role: newUser.role }, process.env.JWT_SECRET!, { expiresIn: '24h' });
+    res.json({ token, user: newUser });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/auth/login', async (req, res) => {
-  const { email, password, role } = req.body;
-  // In a real app, verify against Supabase Auth
-  // For now, return a mock token with the requested role
-  const token = jwt.sign({ id: 'user-123', email, role: role || 'advertiser' }, process.env.JWT_SECRET!, { expiresIn: '24h' });
-  res.json({ token, user: { id: 'user-123', email, role: role || 'advertiser' } });
+  const { email, password } = req.body;
+  try {
+    const { data: user, error } = await db.users().select('*').eq('email', email).eq('password', password).single();
+    
+    if (error || !user) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, process.env.JWT_SECRET!, { expiresIn: '24h' });
+    res.json({ token, user });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/auth/me', authenticate, async (req: any, res) => {
+  try {
+    const { data: user, error } = await db.users().select('*').eq('id', req.user.id).single();
+    if (error || !user) return res.status(404).json({ error: 'User not found' });
+    res.json(user);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Admin Routes
@@ -226,6 +272,23 @@ app.post('/api/impressions/verify', authenticate, authorize(['driver']), async (
 
 // --- Database Initialization & Seeding ---
 const seedDatabase = async () => {
+  // Check if admin user exists
+  const { data: adminUser } = await db.users().select('id').eq('email', 'admin@danfodrive.com').single();
+  if (!adminUser) {
+    console.log('Seeding admin user...');
+    const { data: newUser } = await db.users().insert({
+      email: 'admin@danfodrive.com',
+      password: 'adminpassword', // In real app, hash this!
+      role: 'admin',
+      name: 'Super Admin',
+      subscription_tier: 'premium'
+    }).select().single();
+    
+    if (newUser) {
+      await db.wallets().insert({ user_id: newUser.id, balance: 1000000 });
+    }
+  }
+
   // Check if routes exist
   const { count } = await db.routes().select('*', { count: 'exact', head: true });
   

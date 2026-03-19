@@ -13,6 +13,7 @@ import {
   Tooltip, ResponsiveContainer, BarChart, Bar, Cell
 } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
+import { Map, AdvancedMarker, Pin, useMap } from '@vis.gl/react-google-maps';
 
 // --- Mock Data ---
 const earningsTrendData = [
@@ -25,7 +26,26 @@ const earningsTrendData = [
   { name: 'Sun', val: 5200 },
 ];
 
-// --- Sub-Components ---
+// --- Driver Map Component ---
+const DriverMap = ({ lat, lng }: { lat: number, lng: number }) => {
+  return (
+    <div className="w-full h-full bg-zinc-950 rounded-3xl overflow-hidden border border-zinc-800">
+      <Map
+        defaultCenter={{ lat, lng }}
+        defaultZoom={14}
+        mapId="DRIVER_PORTAL_MAP"
+        internalUsageAttributionIds={['gmp_mcp_codeassist_v1_aistudio']}
+        style={{ width: '100%', height: '100%' }}
+        gestureHandling={'greedy'}
+        disableDefaultUI={true}
+      >
+        <AdvancedMarker position={{ lat, lng }}>
+          <Pin background="#facc15" glyphColor="#000" borderColor="#000" />
+        </AdvancedMarker>
+      </Map>
+    </div>
+  );
+};
 
 const StatCard = ({ label, value, icon: Icon, trend, color = "yellow", onClick }: any) => (
   <div 

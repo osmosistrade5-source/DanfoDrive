@@ -5,13 +5,20 @@ import {
   TrendingUp, ArrowUpRight, ShieldCheck, CreditCard, Zap,
   BarChart3, Settings, LogOut, Bell, Search, Filter,
   Play, Pause, Edit3, Trash2, CheckCircle2, AlertCircle,
-  Truck, Users, Timer, DollarSign, Lock, Activity, Map, Info, X
+  Truck, Users, Timer, DollarSign, Lock, Activity, Map as MapIcon, Info, X
 } from 'lucide-react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, 
   Tooltip, ResponsiveContainer, BarChart, Bar, Cell
 } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
+import { APIProvider, Map, AdvancedMarker, Pin, InfoWindow, useMap, useMapsLibrary } from '@vis.gl/react-google-maps';
+
+const API_KEY =
+  process.env.GOOGLE_MAPS_PLATFORM_KEY ||
+  (import.meta as any).env?.VITE_GOOGLE_MAPS_PLATFORM_KEY ||
+  (globalThis as any).GOOGLE_MAPS_PLATFORM_KEY ||
+  '';
 
 // --- Mock Data ---
 const impressionTrendData = [
@@ -453,76 +460,45 @@ const CreateCampaignFlow = ({ setActiveTab, wallet, routes, onRefresh, initialRo
 // --- Smart Route Heatmap Component ---
 
 const RouteHeatmap = ({ routes, onSelectRoute, selectedRoute }: any) => {
+  const map = useMap();
+  
   return (
     <div className="relative w-full h-full bg-zinc-950 rounded-3xl overflow-hidden border border-zinc-800">
-      {/* Stylized Map Background */}
-      <svg viewBox="0 0 1000 600" className="w-full h-full opacity-40">
-        {/* Lagos Coastline Outline (Stylized) */}
-        <path 
-          d="M0,400 Q200,380 400,450 T800,420 T1000,500 L1000,600 L0,600 Z" 
-          fill="#18181b" 
-          stroke="#27272a" 
-          strokeWidth="2"
-        />
-        {/* Grid Lines */}
-        {[...Array(10)].map((_, i) => (
-          <line key={`h-${i}`} x1="0" y1={i * 60} x2="1000" y2={i * 60} stroke="#27272a" strokeWidth="1" strokeDasharray="4 4" />
-        ))}
-        {[...Array(16)].map((_, i) => (
-          <line key={`v-${i}`} x1={i * 62.5} y1="0" x2={i * 62.5} y2="600" stroke="#27272a" strokeWidth="1" strokeDasharray="4 4" />
-        ))}
-      </svg>
-
-      {/* Routes Layer */}
-      <svg viewBox="0 0 1000 600" className="absolute inset-0 w-full h-full">
+      <Map
+        defaultCenter={{ lat: 6.5244, lng: 3.3792 }}
+        defaultZoom={11}
+        mapId="DANFO_DRIVE_MAP"
+        internalUsageAttributionIds={['gmp_mcp_codeassist_v1_aistudio']}
+        style={{ width: '100%', height: '100%' }}
+        gestureHandling={'greedy'}
+        disableDefaultUI={true}
+      >
         {routes.map((route: any) => {
           let coords = [];
           try {
             coords = JSON.parse(route.coordinates || "[]");
           } catch (e) {
-            console.error("Failed to parse coordinates for route", route.id);
             return null;
           }
-          if (coords.length < 2) return null;
+          if (coords.length === 0) return null;
           
-          const pathD = `M${coords[0][0]},${coords[0][1]} ${coords.slice(1).map((c: any) => `L${c[0]},${c[1]}`).join(' ')}`;
+          const position = { lat: coords[0][0], lng: coords[0][1] };
           const color = route.current_density === 'high' ? '#ef4444' : route.current_density === 'medium' ? '#facc15' : '#22c55e';
-          const isSelected = selectedRoute?.id === route.id;
-
+          
           return (
-            <g key={route.id} className="cursor-pointer group" onClick={() => onSelectRoute(route)}>
-              {/* Glow effect for selected */}
-              {isSelected && (
-                <path 
-                  d={pathD} 
-                  fill="none" 
-                  stroke={color} 
-                  strokeWidth="12" 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
-                  className="opacity-20 animate-pulse"
-                />
-              )}
-              {/* Main Path */}
-              <path 
-                d={pathD} 
-                fill="none" 
-                stroke={color} 
-                strokeWidth={isSelected ? "6" : "4"} 
-                strokeLinecap="round" 
-                strokeLinejoin="round" 
-                className="transition-all duration-300 group-hover:stroke-white"
-              />
-              {/* Start/End Dots */}
-              <circle cx={coords[0][0]} cy={coords[0][1]} r="4" fill="white" />
-              <circle cx={coords[coords.length-1][0]} cy={coords[coords.length-1][1]} r="4" fill="white" />
-            </g>
+            <AdvancedMarker
+              key={route.id}
+              position={position}
+              onClick={() => onSelectRoute(route)}
+            >
+              <Pin background={color} glyphColor="#fff" borderColor="white" />
+            </AdvancedMarker>
           );
         })}
-      </svg>
+      </Map>
 
       {/* Legend */}
-      <div className="absolute bottom-6 left-6 bg-zinc-900/80 backdrop-blur-md p-4 rounded-2xl border border-zinc-800 space-y-2">
+      <div className="absolute bottom-6 left-6 bg-zinc-900/80 backdrop-blur-md p-4 rounded-2xl border border-zinc-800 space-y-2 z-10">
         <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2">Passenger Density</p>
         <div className="flex items-center gap-3">
           <div className="w-3 h-3 rounded-full bg-red-500 shadow-lg shadow-red-500/20" />
@@ -1190,7 +1166,7 @@ export const AdvertiserDashboard = () => {
             {[
               { id: 'overview', icon: LayoutDashboard, label: 'Overview' },
               { id: 'campaigns', icon: Megaphone, label: 'Campaigns' },
-              { id: 'routes', icon: Map, label: 'Smart Routes' },
+              { id: 'routes', icon: MapIcon, label: 'Smart Routes' },
               { id: 'create', icon: Plus, label: 'Create Campaign' },
               { id: 'wallet', icon: Wallet, label: 'Budget Wallet' },
               { id: 'analytics', icon: BarChart3, label: 'Analytics' },

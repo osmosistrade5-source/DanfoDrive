@@ -6,6 +6,7 @@ import { DriverPortal } from './components/DriverPortal';
 import AdminDashboard from './components/AdminDashboard';
 import { QrCode, Activity, MapPin, ChevronLeft } from 'lucide-react';
 import { Routes, Route, useNavigate, Navigate, useLocation } from 'react-router-dom';
+import { APIProvider } from '@vis.gl/react-google-maps';
 
 // --- Types ---
 interface Campaign {
@@ -206,6 +207,13 @@ const AdPlayer = ({ onBack }: { onBack: () => void }) => {
 
 // --- Main App ---
 
+const API_KEY =
+  process.env.GOOGLE_MAPS_PLATFORM_KEY ||
+  (import.meta as any).env?.VITE_GOOGLE_MAPS_PLATFORM_KEY ||
+  (globalThis as any).GOOGLE_MAPS_PLATFORM_KEY ||
+  '';
+const hasValidKey = Boolean(API_KEY) && API_KEY !== 'YOUR_API_KEY';
+
 export default function App() {
   const [userRole, setUserRole] = useState<'guest' | 'advertiser' | 'driver' | 'admin'>('guest');
   const navigate = useNavigate();
@@ -229,70 +237,113 @@ export default function App() {
     else navigate('/');
   };
 
-  return (
-    <div className="min-h-screen bg-black">
-      <Routes>
-        <Route path="/" element={<LandingPage onGetStarted={(role) => handleRoleChange(role)} />} />
-        <Route 
-          path="/advertiser" 
-          element={
-            <ProtectedRoute role="advertiser" userRole={userRole}>
-              <AdvertiserDashboard />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/driver" 
-          element={
-            <ProtectedRoute role="driver" userRole={userRole}>
-              <DriverPortal />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/admin" 
-          element={
-            <ProtectedRoute role="admin" userRole={userRole}>
-              <AdminDashboard />
-            </ProtectedRoute>
-          } 
-        />
-        <Route path="/player" element={<AdPlayer onBack={() => navigate('/')} />} />
-      </Routes>
-
-      {/* Demo Role Switcher (Floating) */}
-      <div className="fixed bottom-8 right-8 z-[200] flex gap-2 p-2 bg-zinc-900/80 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl">
-        <button 
-          onClick={() => handleRoleChange('guest')}
-          className={`p-2 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-colors ${location.pathname === '/' ? 'bg-yellow-400 text-black' : 'text-zinc-500 hover:text-white'}`}
-        >
-          Home
-        </button>
-        <button 
-          onClick={() => handleRoleChange('advertiser')}
-          className={`p-2 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-colors ${location.pathname === '/advertiser' ? 'bg-yellow-400 text-black' : 'text-zinc-500 hover:text-white'}`}
-        >
-          Ads
-        </button>
-        <button 
-          onClick={() => handleRoleChange('driver')}
-          className={`p-2 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-colors ${location.pathname === '/driver' ? 'bg-yellow-400 text-black' : 'text-zinc-500 hover:text-white'}`}
-        >
-          Driver
-        </button>
-        <button 
-          onClick={() => handleRoleChange('admin')}
-          className={`p-2 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-colors ${location.pathname === '/admin' ? 'bg-yellow-400 text-black' : 'text-zinc-500 hover:text-white'}`}
-        >
-          Admin
-        </button>
-        <button 
-          onClick={() => navigate('/player')}
-          className={`p-2 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-colors ${location.pathname === '/player' ? 'bg-yellow-400 text-black' : 'text-zinc-500 hover:text-white'}`}
-        >
-          Player
-        </button>
+  if (!hasValidKey && location.pathname !== '/') {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center p-6 font-sans text-white">
+        <div className="max-w-xl text-center space-y-8">
+          <div className="w-20 h-20 bg-yellow-400 rounded-3xl flex items-center justify-center text-black font-black text-4xl mx-auto shadow-2xl shadow-yellow-400/20">D</div>
+          <div className="space-y-4">
+            <h2 className="text-4xl font-black tracking-tighter">Google Maps API Key Required</h2>
+            <p className="text-zinc-400 text-lg">To enable real-time transit tracking and route analytics, please configure your Google Maps API key.</p>
+          </div>
+          
+          <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-[2.5rem] text-left space-y-6">
+            <div className="space-y-2">
+              <p className="text-xs font-black text-yellow-400 uppercase tracking-widest">Step 1</p>
+              <p className="text-sm font-bold text-zinc-300">Get an API Key from the <a href="https://console.cloud.google.com/google/maps-apis/credentials" target="_blank" rel="noopener" className="text-yellow-400 underline underline-offset-4">Google Cloud Console</a>.</p>
+            </div>
+            
+            <div className="space-y-2">
+              <p className="text-xs font-black text-yellow-400 uppercase tracking-widest">Step 2</p>
+              <p className="text-sm font-bold text-zinc-300">Add your key as a secret in AI Studio:</p>
+              <ul className="text-xs text-zinc-500 space-y-2 mt-4 list-disc pl-4">
+                <li>Open <strong>Settings</strong> (⚙️ gear icon, top-right corner)</li>
+                <li>Select <strong>Secrets</strong></li>
+                <li>Type <code>GOOGLE_MAPS_PLATFORM_KEY</code> as the secret name</li>
+                <li>Paste your API key as the value and press <strong>Enter</strong></li>
+              </ul>
+            </div>
+          </div>
+          
+          <p className="text-xs font-bold text-zinc-600 uppercase tracking-widest animate-pulse">The app rebuilds automatically after you add the secret.</p>
+          
+          <button 
+            onClick={() => navigate('/')}
+            className="text-zinc-500 hover:text-white transition-colors font-bold text-sm uppercase tracking-widest"
+          >
+            Back to Landing Page
+          </button>
+        </div>
       </div>
-    </div>
+    );
+  }
+
+  return (
+    <APIProvider apiKey={API_KEY} version="weekly">
+      <div className="min-h-screen bg-black">
+        <Routes>
+          <Route path="/" element={<LandingPage onGetStarted={(role) => handleRoleChange(role)} />} />
+          <Route 
+            path="/advertiser" 
+            element={
+              <ProtectedRoute role="advertiser" userRole={userRole}>
+                <AdvertiserDashboard />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/driver" 
+            element={
+              <ProtectedRoute role="driver" userRole={userRole}>
+                <DriverPortal />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/admin" 
+            element={
+              <ProtectedRoute role="admin" userRole={userRole}>
+                <AdminDashboard />
+              </ProtectedRoute>
+            } 
+          />
+          <Route path="/player" element={<AdPlayer onBack={() => navigate('/')} />} />
+        </Routes>
+
+        {/* Demo Role Switcher (Floating) */}
+        <div className="fixed bottom-8 right-8 z-[200] flex gap-2 p-2 bg-zinc-900/80 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl">
+          <button 
+            onClick={() => handleRoleChange('guest')}
+            className={`p-2 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-colors ${location.pathname === '/' ? 'bg-yellow-400 text-black' : 'text-zinc-500 hover:text-white'}`}
+          >
+            Home
+          </button>
+          <button 
+            onClick={() => handleRoleChange('advertiser')}
+            className={`p-2 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-colors ${location.pathname === '/advertiser' ? 'bg-yellow-400 text-black' : 'text-zinc-500 hover:text-white'}`}
+          >
+            Ads
+          </button>
+          <button 
+            onClick={() => handleRoleChange('driver')}
+            className={`p-2 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-colors ${location.pathname === '/driver' ? 'bg-yellow-400 text-black' : 'text-zinc-500 hover:text-white'}`}
+          >
+            Driver
+          </button>
+          <button 
+            onClick={() => handleRoleChange('admin')}
+            className={`p-2 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-colors ${location.pathname === '/admin' ? 'bg-yellow-400 text-black' : 'text-zinc-500 hover:text-white'}`}
+          >
+            Admin
+          </button>
+          <button 
+            onClick={() => navigate('/player')}
+            className={`p-2 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-colors ${location.pathname === '/player' ? 'bg-yellow-400 text-black' : 'text-zinc-500 hover:text-white'}`}
+          >
+            Player
+          </button>
+        </div>
+      </div>
+    </APIProvider>
   );
 }

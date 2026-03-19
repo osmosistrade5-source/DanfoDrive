@@ -48,8 +48,37 @@ import {
   Area
 } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
+import { Map, AdvancedMarker, Pin, useMap } from '@vis.gl/react-google-maps';
 
-// --- Types ---
+// --- Admin Map Component ---
+const AdminMap = ({ drivers }: { drivers: any[] }) => {
+  return (
+    <div className="w-full h-full bg-zinc-950 rounded-3xl overflow-hidden border border-zinc-800">
+      <Map
+        defaultCenter={{ lat: 6.5244, lng: 3.3792 }}
+        defaultZoom={11}
+        mapId="ADMIN_DASHBOARD_MAP"
+        internalUsageAttributionIds={['gmp_mcp_codeassist_v1_aistudio']}
+        style={{ width: '100%', height: '100%' }}
+        gestureHandling={'greedy'}
+        disableDefaultUI={true}
+      >
+        {drivers.map((driver: any) => (
+          <AdvancedMarker
+            key={driver.id}
+            position={{ lat: driver.last_lat, lng: driver.last_lng }}
+          >
+            <Pin 
+              background={driver.device_status === 'online' ? '#22c55e' : '#ef4444'} 
+              glyphColor="#fff" 
+              borderColor="white" 
+            />
+          </AdvancedMarker>
+        ))}
+      </Map>
+    </div>
+  );
+};
 
 interface AdminStats {
   metrics: {

@@ -4,7 +4,9 @@ import api from './services/api';
 import { LandingPage } from './components/LandingPage';
 import { AdvertiserDashboard } from './components/AdvertiserDashboard';
 import { DriverPortal } from './components/DriverPortal';
-import AdminPanel from './components/AdminPanel';
+import AdminLogin from './components/AdminLogin';
+import AdminDashboard from './components/AdminDashboard';
+import AdminSetup from './components/AdminSetup';
 import { QrCode, Activity, MapPin, ChevronLeft, LogIn, UserPlus } from 'lucide-react';
 import { Routes, Route, useNavigate, Navigate, useLocation } from 'react-router-dom';
 import { APIProvider } from '@vis.gl/react-google-maps';
@@ -36,14 +38,14 @@ interface Device {
 const ProtectedRoute = ({ children, role }: { children: React.ReactNode, role: string }) => {
   const token = localStorage.getItem('danfodrive_token');
   const userStr = localStorage.getItem('danfodrive_user');
-  const user = userStr ? JSON.parse(userStr) : null;
+  const user = (userStr && userStr !== 'undefined') ? JSON.parse(userStr) : null;
 
   if (!token || !user) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={role === 'admin' ? "/admin/login" : "/"} replace />;
   }
 
   if (role !== 'any' && user.role !== role && user.role !== 'admin') {
-    return <Navigate to="/" replace />;
+    return <Navigate to={role === 'admin' ? "/admin/login" : "/"} replace />;
   }
 
   return <>{children}</>;
@@ -378,8 +380,18 @@ export default function App() {
 
   useEffect(() => {
     const storedUser = localStorage.getItem('danfodrive_user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
+    if (storedUser === 'undefined') {
+      localStorage.removeItem('danfodrive_user');
+      localStorage.removeItem('danfodrive_token');
+      return;
+    }
+    if (storedUser && storedUser !== 'undefined') {
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch (e) {
+        console.error("Failed to parse stored user", e);
+        localStorage.removeItem('danfodrive_user');
+      }
     }
   }, []);
 
@@ -390,10 +402,12 @@ export default function App() {
       const { token, user } = response.data;
       
       localStorage.setItem('danfodrive_token', token);
-      localStorage.setItem('danfodrive_user', JSON.stringify(user));
-      setUser(user);
+      if (user) {
+        localStorage.setItem('danfodrive_user', JSON.stringify(user));
+        setUser(user);
+      }
 
-      if (user.role === 'admin') navigate('/admin');
+      if (user.role === 'admin') navigate('/admin/dashboard');
       else if (user.role === 'advertiser') navigate('/advertiser');
       else if (user.role === 'driver') navigate('/driver');
     } catch (error) {
@@ -446,7 +460,17 @@ export default function App() {
             path="/admin" 
             element={
               <ProtectedRoute role="admin">
-                <AdminPanel onLogout={handleLogout} />
+                <AdminDashboard onLogout={handleLogout} />
+              </ProtectedRoute>
+            } 
+          />
+          <Route path="/admin/login" element={<AdminLogin />} />
+          <Route path="/setup-admin" element={<AdminSetup />} />
+          <Route 
+            path="/admin/dashboard" 
+            element={
+              <ProtectedRoute role="admin">
+                <AdminDashboard onLogout={handleLogout} />
               </ProtectedRoute>
             } 
           />
@@ -484,10 +508,10 @@ export default function App() {
                 Login Driver
               </button>
               <button 
-                onClick={() => handleAuth({ email: 'admin@danfodrive.com', password: 'password' }, 'login')}
+                onClick={() => navigate('/admin/login')}
                 className="p-2 rounded-lg text-[10px] font-black uppercase tracking-tighter text-zinc-500 hover:text-white"
               >
-                Login Admin
+                Admin Login
               </button>
             </>
           ) : (

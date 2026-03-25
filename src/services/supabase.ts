@@ -7,16 +7,29 @@ export const getSupabase = (): SupabaseClient => {
     const supabaseUrl = process.env.SUPABASE_URL || '';
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
-    if (!supabaseUrl || !supabaseKey) {
-      throw new Error('Supabase credentials missing. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in environment variables.');
+    const isPlaceholder = (val: string, isUrl: boolean = false) => 
+      !val || 
+      val.includes('your-project-id') || 
+      val.includes('your-service-role-key') || 
+      val.includes('your_supabase_project_url') ||
+      val.includes('your_supabase_service_role_key') ||
+      (isUrl && !val.startsWith('http'));
+
+    if (isPlaceholder(supabaseUrl, true) || isPlaceholder(supabaseKey)) {
+      throw new Error('SUPABASE_NOT_CONFIGURED');
     }
 
-    supabaseInstance = createClient(supabaseUrl, supabaseKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
-    });
+    try {
+      supabaseInstance = createClient(supabaseUrl, supabaseKey, {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      });
+    } catch (error) {
+      console.error('Failed to initialize Supabase client:', error);
+      throw new Error('SUPABASE_NOT_CONFIGURED');
+    }
   }
   return supabaseInstance;
 };

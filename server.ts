@@ -8,7 +8,7 @@ import morgan from 'morgan';
 import dotenv from 'dotenv';
 import jwt from 'jsonwebtoken';
 import { authenticate, authorize } from './src/middleware/auth';
-import { db } from './src/services/supabase';
+import { db, getSupabase } from './src/services/supabase';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -19,6 +19,7 @@ const __dirname = path.dirname(__filename);
 dotenv.config();
 
 const app = express();
+app.set('trust proxy', 1); // Trust first proxy (Nginx)
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
@@ -38,7 +39,10 @@ app.use(morgan('dev'));
 // Rate Limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
+  max: 100, // limit each IP to 100 requests per windowMs
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  validate: { xForwardedForHeader: false }, // Suppress the warning/error about X-Forwarded-For
 });
 app.use('/api/', limiter);
 
@@ -61,9 +65,137 @@ io.on('connection', (socket) => {
   });
 });
 
-// --- API Routes ---
+// --- Admin Auth Routes ---
 
-// Auth Routes (Public)
+const adminLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // limit each IP to 5 login attempts per windowMs
+  message: { error: 'Too many login attempts, please try again after 15 minutes' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.post('/api/admin/setup', async (req, res) => {
+  const { email, password, name } = req.body;
+
+  try {
+    // 1. Validate Gmail domain
+    if (!email.endsWith('@gmail.com')) {
+      return res.status(400).json({ error: 'Only Gmail accounts allowed' });
+    }
+
+    // 2. Check if any admin already exists (one-time setup)
+    const { count, error: countError } = await getSupabase()
+      .from('admins')
+      .select('*', { count: 'exact', head: true });
+
+    if (countError && countError.code !== '42P01') {
+      console.error('Check admin error:', countError);
+      return res.status(500).json({ error: 'Database error during setup check.' });
+    }
+
+    if (count && count > 0) {
+      return res.status(400).json({ error: 'Admin already exists. Setup is disabled.' });
+    }
+
+    // 3. Create user in Supabase Auth
+    const { data: authData, error: authError } = await getSupabase().auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { role: 'admin', name: name || 'Admin' }
+    });
+
+    if (authError) {
+      console.error('Auth creation error:', authError);
+      return res.status(400).json({ error: authError.message });
+    }
+
+    // 4. Insert into admins table
+    const { error: insertError } = await getSupabase()
+      .from('admins')
+      .insert({
+        id: authData.user.id,
+        email,
+        name: name || 'Admin',
+        role: 'admin'
+      });
+
+    if (insertError) {
+      console.error('Admin insert error:', insertError);
+      // Cleanup auth user if DB insert fails
+      await getSupabase().auth.admin.deleteUser(authData.user.id);
+      return res.status(500).json({ error: 'Failed to save admin record.' });
+    }
+
+    res.json({ success: true, message: 'Admin account created successfully' });
+  } catch (err: any) {
+    console.error('Admin setup error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/api/admin/login', adminLimiter, async (req, res) => {
+  const { email, password } = req.body;
+
+  try {
+    // 1. Validate Gmail domain
+    if (!email.endsWith('@gmail.com')) {
+      return res.status(400).json({ error: 'Only Gmail accounts allowed' });
+    }
+
+    // 2. Authenticate with Supabase Auth
+    const { data: authData, error: authError } = await getSupabase().auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (authError) {
+      return res.status(401).json({ error: 'Invalid login credentials' });
+    }
+
+    // 3. Check if email is in the whitelist (admins table)
+    const { data: adminRecord, error: adminError } = await getSupabase()
+      .from('admins')
+      .select('*')
+      .eq('email', email)
+      .single();
+
+    if (adminError) {
+      console.error('Admin check error:', adminError);
+      if (adminError.code === '42P01') {
+        return res.status(500).json({ error: 'Database error: "admins" table not found. Please create it in Supabase.' });
+      }
+      if (adminError.code === 'PGRST116') {
+        // Not found is fine, just means not an admin
+      } else {
+        return res.status(500).json({ error: 'Database error during admin check.' });
+      }
+    }
+
+    if (!adminRecord) {
+      // Sign out if not an admin
+      await getSupabase().auth.signOut();
+      return res.status(403).json({ error: 'Unauthorized: Not an admin' });
+    }
+
+    // 4. Return session info
+    res.json({
+      token: authData.session.access_token,
+      user: {
+        id: authData.user.id,
+        email: authData.user.email,
+        role: 'admin',
+        name: adminRecord.name || 'Admin'
+      },
+      expires_at: authData.session.expires_at
+    });
+  } catch (err: any) {
+    console.error('Admin login error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 app.post('/api/auth/register', async (req, res) => {
   const { email, password, role, name } = req.body;
   try {
@@ -380,9 +512,19 @@ app.post('/api/impressions/verify', authenticate, authorize(['driver']), async (
 
 // --- Database Initialization & Seeding ---
 const seedDatabase = async () => {
+  try {
+    // Check if Supabase is configured
+    getSupabase();
+  } catch (error: any) {
+    if (error.message === 'SUPABASE_NOT_CONFIGURED') {
+      console.warn('⚠️  Supabase not configured. Skipping database seeding.');
+      return;
+    }
+    throw error;
+  }
+
   // Check if demo users exist
   const demoUsers = [
-    { email: 'admin@danfodrive.com', password: 'password', role: 'admin', name: 'Super Admin' },
     { email: 'advertiser@danfodrive.com', password: 'password', role: 'advertiser', name: 'Advertiser User' },
     { email: 'driver@danfodrive.com', password: 'password', role: 'driver', name: 'Driver User' }
   ];
@@ -393,11 +535,11 @@ const seedDatabase = async () => {
       console.log(`Seeding ${user.role} user...`);
       const { data: newUser } = await db.users().insert({
         ...user,
-        subscription_tier: user.role === 'admin' ? 'premium' : 'free'
+        subscription_tier: 'free'
       }).select().single();
       
       if (newUser) {
-        await db.wallets().insert({ user_id: newUser.id, balance: user.role === 'admin' ? 1000000 : 1000 });
+        await db.wallets().insert({ user_id: newUser.id, balance: 1000 });
       }
     }
   }

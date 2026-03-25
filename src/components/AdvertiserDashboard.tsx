@@ -135,7 +135,8 @@ const routeData = [
 // --- Sub-Components ---
 
 const CreateCampaignFlow = ({ setActiveTab, wallet, routes, onRefresh, initialRouteId, setShowDepositModal }: any) => {
-  const user = JSON.parse(localStorage.getItem('danfodrive_user') || '{}');
+  const userStr = localStorage.getItem('danfodrive_user');
+  const user = (userStr && userStr !== 'undefined') ? JSON.parse(userStr) : {};
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     name: '',
@@ -808,7 +809,8 @@ export const AdvertiserDashboard = ({ onLogout }: { onLogout: () => void }) => {
   const [isDepositing, setIsDepositing] = useState(false);
   const [isChangingPlan, setIsChangingPlan] = useState(false);
 
-  const user = JSON.parse(localStorage.getItem('danfodrive_user') || '{}');
+  const userStr = localStorage.getItem('danfodrive_user');
+  const user = (userStr && userStr !== 'undefined') ? JSON.parse(userStr) : {};
 
   const fetchStats = async () => {
     try {

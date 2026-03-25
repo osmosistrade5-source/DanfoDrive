@@ -172,7 +172,8 @@ const StatCard = ({ label, value, icon: Icon, trend, color = "yellow", onClick }
 );
 
 export const DriverPortal = ({ onLogout }: { onLogout?: () => void }) => {
-  const user = JSON.parse(localStorage.getItem('danfodrive_user') || '{}');
+  const userStr = localStorage.getItem('danfodrive_user');
+  const user = (userStr && userStr !== 'undefined') ? JSON.parse(userStr) : {};
   const DRIVER_ID = user.id;
   const [activeTab, setActiveTab] = useState('overview');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);

@@ -14,6 +14,95 @@ import {
 } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
 import { Map, AdvancedMarker, Pin, useMap } from '@vis.gl/react-google-maps';
+import { searchWithAiMaps, MapGroundingResult } from '../services/geminiMapsService';
+
+const API_KEY =
+  process.env.GOOGLE_MAPS_PLATFORM_KEY ||
+  (import.meta as any).env?.VITE_GOOGLE_MAPS_PLATFORM_KEY ||
+  (globalThis as any).GOOGLE_MAPS_PLATFORM_KEY ||
+  '';
+
+const hasValidKey = Boolean(API_KEY) && API_KEY !== 'YOUR_API_KEY' && API_KEY !== 'DUMMY_KEY';
+
+// --- AI Maps Search Component ---
+const AiMapsSearch = () => {
+  const [query, setQuery] = useState('');
+  const [result, setResult] = useState<MapGroundingResult | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSearch = async () => {
+    if (!query.trim()) return;
+    setIsLoading(true);
+    try {
+      const data = await searchWithAiMaps(query);
+      setResult(data);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 space-y-4 mb-6">
+      <div className="flex items-center gap-3 mb-2">
+        <div className="p-2 bg-yellow-400/10 text-yellow-400 rounded-xl">
+          <Zap size={20} />
+        </div>
+        <h3 className="text-lg font-black tracking-tight">AI Route Intelligence</h3>
+      </div>
+      
+      <div className="flex gap-2">
+        <input 
+          type="text" 
+          placeholder="Ask about Lagos traffic, best routes, or passenger density..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+          className="flex-1 bg-zinc-800 border-none rounded-xl p-3 text-sm font-bold focus:ring-2 focus:ring-yellow-400"
+        />
+        <button 
+          onClick={handleSearch}
+          disabled={isLoading}
+          className="bg-yellow-400 text-black px-4 py-3 rounded-xl font-black text-sm hover:scale-105 transition-transform disabled:opacity-50"
+        >
+          {isLoading ? 'Thinking...' : 'Search'}
+        </button>
+      </div>
+
+      {result && (
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="space-y-4 pt-4 border-t border-zinc-800"
+        >
+          <div className="text-sm text-zinc-300 leading-relaxed font-medium">
+            {result.text}
+          </div>
+          
+          {result.links.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Verified Locations</p>
+              <div className="flex flex-wrap gap-2">
+                {result.links.map((link, i) => (
+                  <a 
+                    key={i}
+                    href={link.uri}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 px-3 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-xs font-bold text-yellow-400 transition-colors border border-zinc-700"
+                  >
+                    <MapPin size={12} />
+                    {link.title}
+                    <ArrowUpRight size={12} />
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+        </motion.div>
+      )}
+    </div>
+  );
+};
 import api from '../services/api';
 
 // --- Mock Data ---
@@ -31,19 +120,33 @@ const earningsTrendData = [
 const DriverMap = ({ lat, lng }: { lat: number, lng: number }) => {
   return (
     <div className="w-full h-full bg-zinc-950 rounded-3xl overflow-hidden border border-zinc-800">
-      <Map
-        defaultCenter={{ lat, lng }}
-        defaultZoom={14}
-        mapId="DRIVER_PORTAL_MAP"
-        internalUsageAttributionIds={['gmp_mcp_codeassist_v1_aistudio']}
-        style={{ width: '100%', height: '100%' }}
-        gestureHandling={'greedy'}
-        disableDefaultUI={true}
-      >
-        <AdvancedMarker position={{ lat, lng }}>
-          <Pin background="#facc15" glyphColor="#000" borderColor="#000" />
-        </AdvancedMarker>
-      </Map>
+      {hasValidKey ? (
+        <Map
+          defaultCenter={{ lat, lng }}
+          defaultZoom={14}
+          mapId="DRIVER_PORTAL_MAP"
+          internalUsageAttributionIds={['gmp_mcp_codeassist_v1_aistudio']}
+          style={{ width: '100%', height: '100%' }}
+          gestureHandling={'greedy'}
+          disableDefaultUI={true}
+        >
+          <AdvancedMarker position={{ lat, lng }}>
+            <Pin background="#facc15" glyphColor="#000" borderColor="#000" />
+          </AdvancedMarker>
+        </Map>
+      ) : (
+        <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center space-y-4 bg-zinc-900/50">
+          <div className="w-12 h-12 bg-zinc-800 rounded-2xl flex items-center justify-center text-zinc-500">
+            <MapPin size={24} />
+          </div>
+          <div className="space-y-1">
+            <h4 className="text-sm font-black tracking-tight uppercase">Map Offline</h4>
+            <p className="text-zinc-500 text-[10px] max-w-[150px] mx-auto uppercase font-bold">
+              API key missing. Use AI search for route info.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -68,9 +171,9 @@ const StatCard = ({ label, value, icon: Icon, trend, color = "yellow", onClick }
   </div>
 );
 
-const DRIVER_ID = 2;
-
 export const DriverPortal = ({ onLogout }: { onLogout?: () => void }) => {
+  const user = JSON.parse(localStorage.getItem('danfodrive_user') || '{}');
+  const DRIVER_ID = user.id;
   const [activeTab, setActiveTab] = useState('overview');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [stats, setStats] = useState<any>(null);
@@ -87,13 +190,13 @@ export const DriverPortal = ({ onLogout }: { onLogout?: () => void }) => {
   const fetchDriverData = async () => {
     try {
       const [statsRes, requestsRes, activeRes, earningsRes, payoutsRes, devicesRes, performanceRes] = await Promise.all([
-        api.get(`/api/driver/stats/${DRIVER_ID}`),
-        api.get(`/api/driver/campaign-requests/${DRIVER_ID}`),
-        api.get(`/api/driver/active-campaigns/${DRIVER_ID}`),
-        api.get(`/api/driver/earnings-history/${DRIVER_ID}`),
-        api.get(`/api/driver/payout-history/${DRIVER_ID}`),
-        api.get(`/api/driver/devices/${DRIVER_ID}`),
-        api.get(`/api/driver/performance/${DRIVER_ID}`)
+        api.get(`/driver/stats/${DRIVER_ID}`),
+        api.get(`/driver/campaign-requests/${DRIVER_ID}`),
+        api.get(`/driver/active-campaigns/${DRIVER_ID}`),
+        api.get(`/driver/earnings-history/${DRIVER_ID}`),
+        api.get(`/driver/payout-history/${DRIVER_ID}`),
+        api.get(`/driver/devices/${DRIVER_ID}`),
+        api.get(`/driver/performance/${DRIVER_ID}`)
       ]);
 
       setStats(statsRes.data);
@@ -145,26 +248,22 @@ export const DriverPortal = ({ onLogout }: { onLogout?: () => void }) => {
 
     setIsWithdrawing(true);
     try {
-      const res = await fetch('/api/driver/withdraw', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          userId: DRIVER_ID, 
-          amount: amount,
-          bankName: 'OPay Digital Bank',
-          accountNumber: '8123456789'
-        })
+      const res = await api.post('/driver/withdraw', { 
+        userId: DRIVER_ID, 
+        amount: amount,
+        bankName: 'OPay Digital Bank',
+        accountNumber: '8123456789'
       });
-      if (res.ok) {
+      if (res.status === 200) {
         setShowWithdrawModal(false);
         setWithdrawAmount('');
         fetchDriverData();
       } else {
-        const data = await res.json();
-        alert(data.error || "Withdrawal failed");
+        alert(res.data.error || "Withdrawal failed");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to withdraw", err);
+      alert(err.response?.data?.error || "Withdrawal failed");
     } finally {
       setIsWithdrawing(false);
     }
@@ -183,6 +282,9 @@ export const DriverPortal = ({ onLogout }: { onLogout?: () => void }) => {
 
   const renderOverview = () => (
     <div className="space-y-8">
+      {/* AI Maps Search Integration */}
+      <AiMapsSearch />
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard 
           label="Wallet Balance" 

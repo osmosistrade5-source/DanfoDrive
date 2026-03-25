@@ -22,8 +22,8 @@ export const NotificationService = {
    * Sends In-App Notification (via DB)
    */
   async sendInApp(userId: string, title: string, message: string) {
-    const { supabase } = await import('./supabase');
-    await supabase.from('notifications').insert({
+    const { getSupabase } = await import('./supabase');
+    await getSupabase().from('notifications').insert({
       user_id: userId,
       title,
       message,

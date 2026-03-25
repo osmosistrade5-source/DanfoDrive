@@ -1,27 +1,35 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.SUPABASE_URL || '';
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ''; // Use service role for backend operations
+let supabaseInstance: SupabaseClient | null = null;
 
-if (!supabaseUrl || !supabaseKey) {
-  console.warn('Supabase credentials missing. Database operations will fail.');
-}
+export const getSupabase = (): SupabaseClient => {
+  if (!supabaseInstance) {
+    const supabaseUrl = process.env.SUPABASE_URL || '';
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
-export const supabase = createClient(supabaseUrl, supabaseKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Supabase credentials missing. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in environment variables.');
+    }
+
+    supabaseInstance = createClient(supabaseUrl, supabaseKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
   }
-});
+  return supabaseInstance;
+};
 
-// Helper for common operations
+// Helper for common operations using lazy initialization
 export const db = {
-  client: supabase,
-  users: () => supabase.from('users'),
-  campaigns: () => supabase.from('campaigns'),
-  wallets: () => supabase.from('wallets'),
-  transactions: () => supabase.from('transactions'),
-  routes: () => supabase.from('routes'),
-  tracking: () => supabase.from('vehicle_tracking'),
-  impressions: () => supabase.from('impressions')
+  client: () => getSupabase(),
+  users: () => getSupabase().from('users'),
+  campaigns: () => getSupabase().from('campaigns'),
+  wallets: () => getSupabase().from('wallets'),
+  transactions: () => getSupabase().from('transactions'),
+  routes: () => getSupabase().from('routes'),
+  tracking: () => getSupabase().from('vehicle_tracking'),
+  impressions: () => getSupabase().from('impressions'),
+  rpc: (name: string, args?: any) => getSupabase().rpc(name, args)
 };

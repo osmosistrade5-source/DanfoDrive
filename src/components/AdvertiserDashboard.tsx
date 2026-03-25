@@ -14,12 +14,95 @@ import {
 } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
 import { APIProvider, Map, AdvancedMarker, Pin, InfoWindow, useMap, useMapsLibrary } from '@vis.gl/react-google-maps';
+import { searchWithAiMaps, MapGroundingResult } from '../services/geminiMapsService';
 
 const API_KEY =
   process.env.GOOGLE_MAPS_PLATFORM_KEY ||
   (import.meta as any).env?.VITE_GOOGLE_MAPS_PLATFORM_KEY ||
   (globalThis as any).GOOGLE_MAPS_PLATFORM_KEY ||
   '';
+
+const hasValidKey = Boolean(API_KEY) && API_KEY !== 'YOUR_API_KEY' && API_KEY !== 'DUMMY_KEY';
+
+// --- AI Maps Search Component ---
+const AiMapsSearch = () => {
+  const [query, setQuery] = useState('');
+  const [result, setResult] = useState<MapGroundingResult | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSearch = async () => {
+    if (!query.trim()) return;
+    setIsLoading(true);
+    try {
+      const data = await searchWithAiMaps(query);
+      setResult(data);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="bg-zinc-900 border border-zinc-800 rounded-[2rem] p-6 space-y-4">
+      <div className="flex items-center gap-3 mb-2">
+        <div className="p-2 bg-yellow-400/10 text-yellow-400 rounded-xl">
+          <Zap size={20} />
+        </div>
+        <h3 className="text-lg font-black tracking-tight">AI Transit Intelligence</h3>
+      </div>
+      
+      <div className="flex gap-2">
+        <input 
+          type="text" 
+          placeholder="Ask about Lagos transit routes, traffic density, or ad spots..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+          className="flex-1 bg-zinc-800 border-none rounded-xl p-3 text-sm font-bold focus:ring-2 focus:ring-yellow-400"
+        />
+        <button 
+          onClick={handleSearch}
+          disabled={isLoading}
+          className="bg-yellow-400 text-black px-4 py-3 rounded-xl font-black text-sm hover:scale-105 transition-transform disabled:opacity-50"
+        >
+          {isLoading ? 'Thinking...' : 'Search'}
+        </button>
+      </div>
+
+      {result && (
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="space-y-4 pt-4 border-t border-zinc-800"
+        >
+          <div className="text-sm text-zinc-300 leading-relaxed font-medium">
+            {result.text}
+          </div>
+          
+          {result.links.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Verified Locations</p>
+              <div className="flex flex-wrap gap-2">
+                {result.links.map((link, i) => (
+                  <a 
+                    key={i}
+                    href={link.uri}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 px-3 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-xs font-bold text-yellow-400 transition-colors border border-zinc-700"
+                  >
+                    <MapPin size={12} />
+                    {link.title}
+                    <ArrowUpRight size={12} />
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+        </motion.div>
+      )}
+    </div>
+  );
+};
 
 // --- Mock Data ---
 const impressionTrendData = [
@@ -52,6 +135,7 @@ const routeData = [
 // --- Sub-Components ---
 
 const CreateCampaignFlow = ({ setActiveTab, wallet, routes, onRefresh, initialRouteId, setShowDepositModal }: any) => {
+  const user = JSON.parse(localStorage.getItem('danfodrive_user') || '{}');
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     name: '',
@@ -70,12 +154,8 @@ const CreateCampaignFlow = ({ setActiveTab, wallet, routes, onRefresh, initialRo
   const handlePaySubscription = async (tier: string, amount: number) => {
     setIsPaying(true);
     try {
-      const res = await fetch('/api/subscription/pay', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: 1, tier, amount })
-      });
-      if (res.ok) {
+      const res = await api.post('/subscription/pay', { userId: user.id, tier, amount });
+      if (res.status === 200) {
         await onRefresh();
       }
     } finally {
@@ -91,29 +171,24 @@ const CreateCampaignFlow = ({ setActiveTab, wallet, routes, onRefresh, initialRo
 
     setIsLaunching(true);
     try {
-      const res = await fetch('/api/campaigns', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          advertiser_id: 1,
-          name: formData.name,
-          budget: formData.budget,
-          route_id: formData.routeId,
-          drivers_count: formData.drivers,
-          schedule_json: formData.schedule
-        })
+      const res = await api.post('/campaigns', {
+        advertiser_id: user.id,
+        name: formData.name,
+        budget: formData.budget,
+        route_id: formData.routeId,
+        drivers_count: formData.drivers,
+        schedule_json: formData.schedule
       });
 
-      if (res.ok) {
+      if (res.status === 200) {
         await onRefresh();
         setActiveTab('campaigns');
       } else {
-        const err = await res.json();
-        alert(err.error || "Failed to launch campaign");
+        alert(res.data.error || "Failed to launch campaign");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Launch error:", error);
-      alert("An error occurred while launching the campaign.");
+      alert(error.response?.data?.error || "An error occurred while launching the campaign.");
     } finally {
       setIsLaunching(false);
     }
@@ -465,38 +540,52 @@ const RouteHeatmap = ({ routes, onSelectRoute, selectedRoute }: any) => {
   
   return (
     <div className="relative w-full h-full bg-zinc-950 rounded-3xl overflow-hidden border border-zinc-800">
-      <Map
-        defaultCenter={{ lat: 6.5244, lng: 3.3792 }}
-        defaultZoom={11}
-        mapId="DANFO_DRIVE_MAP"
-        internalUsageAttributionIds={['gmp_mcp_codeassist_v1_aistudio']}
-        style={{ width: '100%', height: '100%' }}
-        gestureHandling={'greedy'}
-        disableDefaultUI={true}
-      >
-        {routes.map((route: any) => {
-          let coords = [];
-          try {
-            coords = JSON.parse(route.coordinates || "[]");
-          } catch (e) {
-            return null;
-          }
-          if (coords.length === 0) return null;
-          
-          const position = { lat: coords[0][0], lng: coords[0][1] };
-          const color = route.current_density === 'high' ? '#ef4444' : route.current_density === 'medium' ? '#facc15' : '#22c55e';
-          
-          return (
-            <AdvancedMarker
-              key={route.id}
-              position={position}
-              onClick={() => onSelectRoute(route)}
-            >
-              <Pin background={color} glyphColor="#fff" borderColor="white" />
-            </AdvancedMarker>
-          );
-        })}
-      </Map>
+      {hasValidKey ? (
+        <Map
+          defaultCenter={{ lat: 6.5244, lng: 3.3792 }}
+          defaultZoom={11}
+          mapId="DANFO_DRIVE_MAP"
+          internalUsageAttributionIds={['gmp_mcp_codeassist_v1_aistudio']}
+          style={{ width: '100%', height: '100%' }}
+          gestureHandling={'greedy'}
+          disableDefaultUI={true}
+        >
+          {routes.map((route: any) => {
+            let coords = [];
+            try {
+              coords = JSON.parse(route.coordinates || "[]");
+            } catch (e) {
+              return null;
+            }
+            if (coords.length === 0) return null;
+            
+            const position = { lat: coords[0][0], lng: coords[0][1] };
+            const color = route.current_density === 'high' ? '#ef4444' : route.current_density === 'medium' ? '#facc15' : '#22c55e';
+            
+            return (
+              <AdvancedMarker
+                key={route.id}
+                position={position}
+                onClick={() => onSelectRoute(route)}
+              >
+                <Pin background={color} glyphColor="#fff" borderColor="white" />
+              </AdvancedMarker>
+            );
+          })}
+        </Map>
+      ) : (
+        <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center space-y-4 bg-zinc-900/50">
+          <div className="w-16 h-16 bg-zinc-800 rounded-2xl flex items-center justify-center text-zinc-500">
+            <MapIcon size={32} />
+          </div>
+          <div className="space-y-2">
+            <h4 className="text-xl font-black tracking-tight">Interactive Map Offline</h4>
+            <p className="text-zinc-500 text-sm max-w-xs mx-auto">
+              Google Maps API key is missing. Use the AI Transit Intelligence tool below to explore routes and locations.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Legend */}
       <div className="absolute bottom-6 left-6 bg-zinc-900/80 backdrop-blur-md p-4 rounded-2xl border border-zinc-800 space-y-2 z-10">
@@ -595,15 +684,19 @@ const SmartRoutes = ({ routes, selectedRoute, setSelectedRoute, setActiveTab, se
         </div>
       </div>
 
-      <div className="flex-1 flex gap-8 min-h-0">
-        {/* Map Area */}
-        <div className="flex-1 min-h-0">
-          <RouteHeatmap 
-            routes={filteredRoutes} 
-            onSelectRoute={setSelectedRoute} 
-            selectedRoute={selectedRoute} 
-          />
-        </div>
+      <div className="flex-1 flex flex-col gap-6 min-h-0">
+        {/* AI Maps Search Integration */}
+        <AiMapsSearch />
+
+        <div className="flex-1 flex gap-8 min-h-0">
+          {/* Map Area */}
+          <div className="flex-1 min-h-0">
+            <RouteHeatmap 
+              routes={filteredRoutes} 
+              onSelectRoute={setSelectedRoute} 
+              selectedRoute={selectedRoute} 
+            />
+          </div>
 
         {/* Info Panel */}
         <div className="w-96 bg-zinc-900 border border-zinc-800 rounded-3xl p-8 flex flex-col overflow-y-auto">
@@ -676,7 +769,8 @@ const SmartRoutes = ({ routes, selectedRoute, setSelectedRoute, setActiveTab, se
         </div>
       </div>
     </div>
-  );
+  </div>
+);
 };
 
 // --- Components ---
@@ -740,7 +834,7 @@ export const AdvertiserDashboard = ({ onLogout }: { onLogout: () => void }) => {
   const handleDeposit = async () => {
     setIsDepositing(true);
     try {
-      await api.post('/api/wallet/deposit', { amount: Number(depositAmount) });
+      await api.post('/wallet/deposit', { amount: Number(depositAmount) });
       await fetchStats();
       setShowDepositModal(false);
     } catch (error: any) {
@@ -754,7 +848,7 @@ export const AdvertiserDashboard = ({ onLogout }: { onLogout: () => void }) => {
   const handleSubscriptionChange = async (tier: string, amount: number) => {
     setIsChangingPlan(true);
     try {
-      await api.post('/api/subscription/pay', { tier, amount });
+      await api.post('/subscription/pay', { tier, amount });
       await fetchStats();
       setShowSubscriptionModal(false);
     } catch (error: any) {

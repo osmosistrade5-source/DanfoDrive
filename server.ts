@@ -9,6 +9,12 @@ import dotenv from 'dotenv';
 import jwt from 'jsonwebtoken';
 import { authenticate, authorize } from './src/middleware/auth';
 import { db } from './src/services/supabase';
+import { createServer as createViteServer } from 'vite';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 dotenv.config();
 
@@ -22,7 +28,9 @@ const io = new Server(server, {
 });
 
 // --- Security Middleware ---
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: process.env.NODE_ENV === 'production' ? undefined : false,
+}));
 app.use(cors());
 app.use(express.json());
 app.use(morgan('dev'));
@@ -112,38 +120,130 @@ app.get('/api/auth/me', authenticate, async (req: any, res) => {
 
 // Admin Routes
 app.get('/api/admin/overview', authenticate, authorize(['admin']), async (req, res) => {
-  res.json({
-    total_revenue: 1250000,
-    active_campaigns: 45,
-    total_drivers: 120,
-    total_impressions: 8500000,
-    growth: 12.5
-  });
+  try {
+    const { count: activeCampaigns } = await db.campaigns().select('*', { count: 'exact', head: true }).eq('status', 'active');
+    const { count: totalDrivers } = await db.users().select('*', { count: 'exact', head: true }).eq('role', 'driver');
+    const { count: totalImpressions } = await db.impressions().select('*', { count: 'exact', head: true });
+
+    res.json({
+      metrics: {
+        advertisers: 12, // Mocked
+        drivers: totalDrivers || 0,
+        campaigns: activeCampaigns || 0,
+        vehicles: totalDrivers || 0,
+        revenueToday: 45000, // Mocked
+        pendingPayouts: 12000, // Mocked
+        totalImpressions: totalImpressions || 0
+      },
+      revenueTrend: [
+        { date: '2026-03-01', revenue: 45000 },
+        { date: '2026-03-05', revenue: 52000 },
+        { date: '2026-03-10', revenue: 48000 },
+        { date: '2026-03-15', revenue: 61000 },
+        { date: '2026-03-19', revenue: 55000 }
+      ],
+      routePerformance: [
+        { name: 'Third Mainland Bridge', active_screens: 12 },
+        { name: 'Ikorodu Road', active_screens: 8 },
+        { name: 'Lekki-Epe Expressway', active_screens: 15 },
+        { name: 'Oshodi-Apapa Expressway', active_screens: 6 }
+      ]
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get('/api/admin/advertisers', authenticate, authorize(['admin']), async (req, res) => {
-  const { data } = await db.users().select('*').eq('role', 'advertiser');
-  res.json(data || []);
+  try {
+    const { data } = await db.users().select('*, campaigns(count, budget)').eq('role', 'advertiser');
+    const formatted = data?.map((ad: any) => ({
+      ...ad,
+      campaign_count: ad.campaigns?.length || 0,
+      total_budget: ad.campaigns?.reduce((acc: number, c: any) => acc + (c.budget || 0), 0) || 0
+    }));
+    res.json(formatted || []);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get('/api/admin/drivers', authenticate, authorize(['admin']), async (req, res) => {
-  const { data } = await db.users().select('*').eq('role', 'driver');
-  res.json(data || []);
+  try {
+    const { data } = await db.users().select('*, wallets(balance), tracking(*)').eq('role', 'driver');
+    const formatted = data?.map((d: any) => ({
+      ...d,
+      balance: d.wallets?.[0]?.balance || 0,
+      device_id: d.tracking?.[0]?.device_id || 'N/A',
+      device_status: d.tracking?.[0]?.status || 'offline',
+      last_lat: d.tracking?.[0]?.last_lat || 6.5244,
+      last_lng: d.tracking?.[0]?.last_lng || 3.3792,
+      overall_score: 85, // Mocked
+      rank_category: 'silver', // Mocked
+      campaigns_accepted: 3 // Mocked
+    }));
+    res.json(formatted || []);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get('/api/admin/campaigns', authenticate, authorize(['admin']), async (req, res) => {
-  const { data } = await db.campaigns().select('*, users(email)');
-  res.json(data || []);
+  try {
+    const { data } = await db.campaigns().select('*, users!advertiser_id(name), routes(name)');
+    const formatted = data?.map((c: any) => ({
+      ...c,
+      advertiser_name: c.users?.name || 'Unknown',
+      route_name: c.routes?.name || 'General Route',
+      total_impressions: 0, // Mocked
+      total_minutes: 0 // Mocked
+    }));
+    res.json(formatted || []);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/admin/notifications', authenticate, authorize(['admin']), async (req, res) => {
+  res.json([
+    { id: 1, type: 'alert', message: 'Vehicle DF-2026-001 is off-route', time: '2 mins ago' },
+    { id: 2, type: 'info', message: 'New advertiser registered: TechCorp', time: '1 hour ago' },
+    { id: 3, type: 'success', message: 'Campaign "Summer Sale" budget reached', time: '3 hours ago' }
+  ]);
+});
+
+app.post('/api/admin/users/:id/status', authenticate, authorize(['admin']), async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  const { error } = await db.users().update({ subscription_tier: status }).eq('id', id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+});
+
+app.post('/api/admin/campaigns/:id/status', authenticate, authorize(['admin']), async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  const { error } = await db.campaigns().update({ status }).eq('id', id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
 });
 
 // Advertiser Routes
 app.get('/api/advertiser/stats/:id', authenticate, authorize(['advertiser', 'admin']), async (req, res) => {
-  res.json({
-    active_campaigns: 3,
-    total_spend: 150000,
-    total_impressions: 450000,
-    wallet_balance: 25000
-  });
+  try {
+    const { id } = req.params;
+    const { count: activeCampaigns } = await db.campaigns().select('*', { count: 'exact', head: true }).eq('advertiser_id', id).eq('status', 'active');
+    const { data: wallet } = await db.wallets().select('balance').eq('user_id', id).single();
+    
+    res.json({
+      active_campaigns: activeCampaigns || 0,
+      total_spend: 150000, // Mocked for now
+      total_impressions: 450000, // Mocked for now
+      wallet_balance: wallet?.balance || 0
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get('/api/advertiser/top-drivers', authenticate, authorize(['advertiser', 'admin']), async (req, res) => {
@@ -155,12 +255,20 @@ app.get('/api/advertiser/top-drivers', authenticate, authorize(['advertiser', 'a
 
 // Driver Routes
 app.get('/api/driver/stats/:id', authenticate, authorize(['driver', 'admin']), async (req, res) => {
-  res.json({
-    total_earnings: 85000,
-    active_campaigns: 2,
-    completed_trips: 145,
-    rating: 4.8
-  });
+  try {
+    const { id } = req.params;
+    const { data: wallet } = await db.wallets().select('balance').eq('user_id', id).single();
+    const { count: activeCampaigns } = await db.campaigns().select('*', { count: 'exact', head: true }).eq('status', 'active'); // In real app, filter by driver assignment
+    
+    res.json({
+      total_earnings: wallet?.balance || 0,
+      active_campaigns: activeCampaigns || 0,
+      completed_trips: 145, // Mocked
+      rating: 4.8 // Mocked
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get('/api/driver/active-campaigns/:id', authenticate, authorize(['driver', 'admin']), async (req, res) => {
@@ -260,7 +368,7 @@ app.post('/api/impressions/verify', authenticate, authorize(['driver']), async (
         lng
       });
       // Atomic increment
-      await db.client.rpc('increment_wallet', { user_id: req.user.id, amount: 10 });
+      await db.rpc('increment_wallet', { user_id: req.user.id, amount: 10 });
       res.json({ status: 'verified', reward: 10 });
     } else {
       res.status(403).json({ error: 'Out of route' });
@@ -272,20 +380,25 @@ app.post('/api/impressions/verify', authenticate, authorize(['driver']), async (
 
 // --- Database Initialization & Seeding ---
 const seedDatabase = async () => {
-  // Check if admin user exists
-  const { data: adminUser } = await db.users().select('id').eq('email', 'admin@danfodrive.com').single();
-  if (!adminUser) {
-    console.log('Seeding admin user...');
-    const { data: newUser } = await db.users().insert({
-      email: 'admin@danfodrive.com',
-      password: 'adminpassword', // In real app, hash this!
-      role: 'admin',
-      name: 'Super Admin',
-      subscription_tier: 'premium'
-    }).select().single();
-    
-    if (newUser) {
-      await db.wallets().insert({ user_id: newUser.id, balance: 1000000 });
+  // Check if demo users exist
+  const demoUsers = [
+    { email: 'admin@danfodrive.com', password: 'password', role: 'admin', name: 'Super Admin' },
+    { email: 'advertiser@danfodrive.com', password: 'password', role: 'advertiser', name: 'Advertiser User' },
+    { email: 'driver@danfodrive.com', password: 'password', role: 'driver', name: 'Driver User' }
+  ];
+
+  for (const user of demoUsers) {
+    const { data: existing } = await db.users().select('id').eq('email', user.email).single();
+    if (!existing) {
+      console.log(`Seeding ${user.role} user...`);
+      const { data: newUser } = await db.users().insert({
+        ...user,
+        subscription_tier: user.role === 'admin' ? 'premium' : 'free'
+      }).select().single();
+      
+      if (newUser) {
+        await db.wallets().insert({ user_id: newUser.id, balance: user.role === 'admin' ? 1000000 : 1000 });
+      }
     }
   }
 
@@ -328,12 +441,31 @@ const seedDatabase = async () => {
 };
 
 // --- Start Server ---
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, async () => {
-  console.log(`DanfoDrive Secure Backend running on port ${PORT}`);
-  try {
-    await seedDatabase();
-  } catch (err) {
-    console.error('Database seeding failed:', err);
+const startServer = async () => {
+  // Vite middleware for development
+  if (process.env.NODE_ENV !== "production") {
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: "spa",
+    });
+    app.use(vite.middlewares);
+  } else {
+    const distPath = path.join(process.cwd(), 'dist');
+    app.use(express.static(distPath));
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
   }
-});
+
+  const PORT = process.env.PORT || 3000;
+  server.listen(Number(PORT), "0.0.0.0", async () => {
+    console.log(`DanfoDrive Secure Backend running on port ${PORT}`);
+    try {
+      await seedDatabase();
+    } catch (err) {
+      console.error('Database seeding failed:', err);
+    }
+  });
+};
+
+startServer();

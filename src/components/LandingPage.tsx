@@ -1,17 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { ChevronRight, Play, Shield, Zap, MapPin, TrendingUp, CheckCircle2, QrCode, Activity } from 'lucide-react';
+import api from '../services/api';
 
-export const LandingPage = ({ onGetStarted }: { onGetStarted: (role: string) => void }) => {
+export const LandingPage = ({ onGetStarted, onLogin }: { onGetStarted: (role: string) => void, onLogin: (role: string) => void }) => {
   const [budget, setBudget] = useState(50000);
   const reach = budget; // 1 Naira = 1 Impression as per PRD example
 
   const [onlineCount, setOnlineCount] = useState(52);
 
   useEffect(() => {
-    fetch('/api/devices')
-      .then(res => res.json())
-      .then(data => {
+    api.get('/devices')
+      .then(res => {
+        const data = res.data;
         const online = data.filter((d: any) => d.status === 'online').length;
         setOnlineCount(online > 0 ? online : 52); // Fallback to 52 for demo if none online
       })
@@ -30,6 +31,12 @@ export const LandingPage = ({ onGetStarted }: { onGetStarted: (role: string) => 
           <div className="hidden md:flex items-center gap-8 text-sm font-medium text-zinc-400">
             <a href="#how-it-works" className="hover:text-white transition-colors">How it Works</a>
             <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
+            <button 
+              onClick={() => onLogin('advertiser')}
+              className="hover:text-white transition-colors"
+            >
+              Login
+            </button>
             <button 
               onClick={() => onGetStarted('advertiser')}
               className="bg-white text-black px-5 py-2 rounded-full font-bold hover:bg-yellow-400 transition-colors"

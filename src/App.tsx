@@ -4,8 +4,8 @@ import api from './services/api';
 import { LandingPage } from './components/LandingPage';
 import { AdvertiserDashboard } from './components/AdvertiserDashboard';
 import { DriverPortal } from './components/DriverPortal';
-import AdminDashboard from './components/AdminDashboard';
-import { QrCode, Activity, MapPin, ChevronLeft } from 'lucide-react';
+import AdminPanel from './components/AdminPanel';
+import { QrCode, Activity, MapPin, ChevronLeft, LogIn, UserPlus } from 'lucide-react';
 import { Routes, Route, useNavigate, Navigate, useLocation } from 'react-router-dom';
 import { APIProvider } from '@vis.gl/react-google-maps';
 
@@ -49,6 +49,150 @@ const ProtectedRoute = ({ children, role }: { children: React.ReactNode, role: s
   return <>{children}</>;
 };
 
+// --- Auth Modal ---
+const AuthModal = ({ isOpen, onClose, onAuth, initialMode = 'login', initialRole = 'advertiser' }: { 
+  isOpen: boolean, 
+  onClose: () => void, 
+  onAuth: (data: any, mode: 'login' | 'signup') => void,
+  initialMode?: 'login' | 'signup',
+  initialRole?: string
+}) => {
+  const [mode, setMode] = useState<'login' | 'signup'>(initialMode);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [role, setRole] = useState(initialRole);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    setMode(initialMode);
+    setRole(initialRole);
+    setError('');
+  }, [isOpen, initialMode, initialRole]);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    try {
+      if (mode === 'signup') {
+        await onAuth({ email, password, name, role }, 'signup');
+      } else {
+        await onAuth({ email, password }, 'login');
+      }
+      onClose();
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Authentication failed. Please check your credentials.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="bg-zinc-900 border border-white/10 p-8 rounded-[2.5rem] w-full max-w-md shadow-2xl"
+      >
+        <div className="flex justify-between items-center mb-8">
+          <h2 className="text-3xl font-black tracking-tighter text-white">
+            {mode === 'login' ? 'Welcome Back' : 'Join DanfoDrive'}
+          </h2>
+          <button onClick={onClose} className="text-zinc-500 hover:text-white transition-colors">
+            <Activity size={24} className="rotate-45" />
+          </button>
+        </div>
+
+        {error && (
+          <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 text-xs font-bold uppercase tracking-widest">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {mode === 'signup' && (
+            <div>
+              <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2 block">Full Name</label>
+              <input 
+                type="text" 
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full bg-black border border-white/10 rounded-2xl px-6 py-4 text-white focus:border-yellow-400 outline-none transition-colors"
+                placeholder="John Doe"
+                required
+              />
+            </div>
+          )}
+          <div>
+            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2 block">Email Address</label>
+            <input 
+              type="email" 
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full bg-black border border-white/10 rounded-2xl px-6 py-4 text-white focus:border-yellow-400 outline-none transition-colors"
+              placeholder="name@example.com"
+              required
+            />
+          </div>
+          <div>
+            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2 block">Password</label>
+            <input 
+              type="password" 
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full bg-black border border-white/10 rounded-2xl px-6 py-4 text-white focus:border-yellow-400 outline-none transition-colors"
+              placeholder="••••••••"
+              required
+            />
+          </div>
+          {mode === 'signup' && (
+            <div>
+              <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2 block">I am a...</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button 
+                  type="button"
+                  onClick={() => setRole('advertiser')}
+                  className={`py-3 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${role === 'advertiser' ? 'bg-yellow-400 text-black' : 'bg-black text-zinc-500 border border-white/10'}`}
+                >
+                  Advertiser
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => setRole('driver')}
+                  className={`py-3 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${role === 'driver' ? 'bg-yellow-400 text-black' : 'bg-black text-zinc-500 border border-white/10'}`}
+                >
+                  Driver
+                </button>
+              </div>
+            </div>
+          )}
+
+          <button 
+            type="submit"
+            disabled={loading}
+            className="w-full bg-yellow-400 text-black py-4 rounded-2xl font-black text-lg mt-4 hover:scale-[1.02] transition-transform disabled:opacity-50"
+          >
+            {loading ? 'Processing...' : mode === 'login' ? 'Login' : 'Create Account'}
+          </button>
+        </form>
+
+        <div className="mt-8 text-center">
+          <button 
+            onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
+            className="text-sm font-bold text-zinc-500 hover:text-white transition-colors"
+          >
+            {mode === 'login' ? "Don't have an account? Sign up" : "Already have an account? Login"}
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
 // --- Ad Player Component (The "IoT" View) ---
 const AdPlayer = ({ onBack }: { onBack: () => void }) => {
   const [currentAd, setCurrentAd] = useState<any>(null);
@@ -59,7 +203,7 @@ const AdPlayer = ({ onBack }: { onBack: () => void }) => {
   useEffect(() => {
     const fetchAd = async () => {
       try {
-        const res = await api.get(`/api/ads/active?lat=${location.lat}&lng=${location.lng}`);
+        const res = await api.get(`/ads/active?lat=${location.lat}&lng=${location.lng}`);
         const ads = res.data;
         if (ads.length > 0) {
           const selected = ads[Math.floor(Math.random() * ads.length)];
@@ -80,7 +224,7 @@ const AdPlayer = ({ onBack }: { onBack: () => void }) => {
       const logImpression = async () => {
         setIsLogging(true);
         try {
-          await api.post('/api/impressions/log', {
+          await api.post('/impressions/log', {
             deviceId: 'DF-2026-001', // Mock device ID
             adId: currentAd.id,
             lat: location.lat,
@@ -226,6 +370,9 @@ const hasValidKey = Boolean(API_KEY) && API_KEY !== 'YOUR_API_KEY';
 
 export default function App() {
   const [user, setUser] = useState<any>(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
+  const [authRole, setAuthRole] = useState('advertiser');
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -236,9 +383,10 @@ export default function App() {
     }
   }, []);
 
-  const handleLogin = async (email: string, role: string) => {
+  const handleAuth = async (data: any, mode: 'login' | 'signup') => {
     try {
-      const response = await api.post('/auth/login', { email, password: 'password', role });
+      const endpoint = mode === 'login' ? '/auth/login' : '/auth/register';
+      const response = await api.post(endpoint, data);
       const { token, user } = response.data;
       
       localStorage.setItem('danfodrive_token', token);
@@ -249,9 +397,21 @@ export default function App() {
       else if (user.role === 'advertiser') navigate('/advertiser');
       else if (user.role === 'driver') navigate('/driver');
     } catch (error) {
-      console.error('Login failed:', error);
-      alert('Login failed. Please try again.');
+      console.error('Auth failed:', error);
+      throw error;
     }
+  };
+
+  const handleLoginClick = (role: string = 'advertiser') => {
+    setAuthRole(role);
+    setAuthMode('login');
+    setIsAuthModalOpen(true);
+  };
+
+  const handleSignupClick = (role: string = 'advertiser') => {
+    setAuthRole(role);
+    setAuthMode('signup');
+    setIsAuthModalOpen(true);
   };
 
   const handleLogout = () => {
@@ -261,52 +421,11 @@ export default function App() {
     navigate('/');
   };
 
-  if (!hasValidKey && location.pathname !== '/') {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center p-6 font-sans text-white">
-        <div className="max-w-xl text-center space-y-8">
-          <div className="w-20 h-20 bg-yellow-400 rounded-3xl flex items-center justify-center text-black font-black text-4xl mx-auto shadow-2xl shadow-yellow-400/20">D</div>
-          <div className="space-y-4">
-            <h2 className="text-4xl font-black tracking-tighter">Google Maps API Key Required</h2>
-            <p className="text-zinc-400 text-lg">To enable real-time transit tracking and route analytics, please configure your Google Maps API key.</p>
-          </div>
-          
-          <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-[2.5rem] text-left space-y-6">
-            <div className="space-y-2">
-              <p className="text-xs font-black text-yellow-400 uppercase tracking-widest">Step 1</p>
-              <p className="text-sm font-bold text-zinc-300">Get an API Key from the <a href="https://console.cloud.google.com/google/maps-apis/credentials" target="_blank" rel="noopener" className="text-yellow-400 underline underline-offset-4">Google Cloud Console</a>.</p>
-            </div>
-            
-            <div className="space-y-2">
-              <p className="text-xs font-black text-yellow-400 uppercase tracking-widest">Step 2</p>
-              <p className="text-sm font-bold text-zinc-300">Add your key as a secret in AI Studio:</p>
-              <ul className="text-xs text-zinc-500 space-y-2 mt-4 list-disc pl-4">
-                <li>Open <strong>Settings</strong> (⚙️ gear icon, top-right corner)</li>
-                <li>Select <strong>Secrets</strong></li>
-                <li>Type <code>GOOGLE_MAPS_PLATFORM_KEY</code> as the secret name</li>
-                <li>Paste your API key as the value and press <strong>Enter</strong></li>
-              </ul>
-            </div>
-          </div>
-          
-          <p className="text-xs font-bold text-zinc-600 uppercase tracking-widest animate-pulse">The app rebuilds automatically after you add the secret.</p>
-          
-          <button 
-            onClick={() => navigate('/')}
-            className="text-zinc-500 hover:text-white transition-colors font-bold text-sm uppercase tracking-widest"
-          >
-            Back to Landing Page
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <APIProvider apiKey={API_KEY} version="weekly">
+    <APIProvider apiKey={API_KEY || 'DUMMY_KEY'} version="weekly">
       <div className="min-h-screen bg-black">
         <Routes>
-          <Route path="/" element={<LandingPage onGetStarted={(role) => handleLogin(`${role}@example.com`, role)} />} />
+          <Route path="/" element={<LandingPage onGetStarted={handleSignupClick} onLogin={handleLoginClick} />} />
           <Route 
             path="/advertiser" 
             element={
@@ -327,12 +446,20 @@ export default function App() {
             path="/admin" 
             element={
               <ProtectedRoute role="admin">
-                <AdminDashboard onLogout={handleLogout} />
+                <AdminPanel onLogout={handleLogout} />
               </ProtectedRoute>
             } 
           />
           <Route path="/player" element={<AdPlayer onBack={() => navigate('/')} />} />
         </Routes>
+
+        <AuthModal 
+          isOpen={isAuthModalOpen} 
+          onClose={() => setIsAuthModalOpen(false)} 
+          onAuth={handleAuth}
+          initialMode={authMode}
+          initialRole={authRole}
+        />
 
         {/* Demo Role Switcher (Floating) */}
         <div className="fixed bottom-8 right-8 z-[200] flex gap-2 p-2 bg-zinc-900/80 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl">
@@ -345,16 +472,22 @@ export default function App() {
           {!user ? (
             <>
               <button 
-                onClick={() => handleLogin('advertiser@example.com', 'advertiser')}
+                onClick={() => handleAuth({ email: 'advertiser@danfodrive.com', password: 'password' }, 'login')}
                 className="p-2 rounded-lg text-[10px] font-black uppercase tracking-tighter text-zinc-500 hover:text-white"
               >
                 Login Ads
               </button>
               <button 
-                onClick={() => handleLogin('driver@example.com', 'driver')}
+                onClick={() => handleAuth({ email: 'driver@danfodrive.com', password: 'password' }, 'login')}
                 className="p-2 rounded-lg text-[10px] font-black uppercase tracking-tighter text-zinc-500 hover:text-white"
               >
                 Login Driver
+              </button>
+              <button 
+                onClick={() => handleAuth({ email: 'admin@danfodrive.com', password: 'password' }, 'login')}
+                className="p-2 rounded-lg text-[10px] font-black uppercase tracking-tighter text-zinc-500 hover:text-white"
+              >
+                Login Admin
               </button>
             </>
           ) : (

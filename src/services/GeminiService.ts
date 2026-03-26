@@ -64,24 +64,29 @@ export async function generateImage(prompt: string) {
   throw new Error("No image generated.");
 }
 
-export async function analyzeImage(prompt: string, base64Image: string, mimeType: string) {
+export async function searchPlaces(query: string, location?: { latitude: number; longitude: number }) {
   const ai = getAIInstance();
   const response = await ai.models.generateContent({
     model: chatModel,
-    contents: {
-      parts: [
-        {
-          inlineData: {
-            data: base64Image,
-            mimeType: mimeType,
-          },
+    contents: query,
+    config: {
+      tools: [{ googleMaps: {} }],
+      toolConfig: {
+        retrievalConfig: {
+          latLng: location ? {
+            latitude: location.latitude,
+            longitude: location.longitude,
+          } : undefined,
         },
-        {
-          text: prompt,
-        },
-      ],
+      },
     },
   });
 
-  return response.text;
+  const text = response.text;
+  const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
+  
+  return {
+    text,
+    groundingChunks,
+  };
 }

@@ -32,6 +32,7 @@ import AdminPanel from './components/AdminPanel';
 import AuthModal from './components/AuthModal';
 import AdminSetup from './components/AdminSetup';
 import AdminLogin from './components/AdminLogin';
+import { MapSearch } from './components/MapSearch';
 
 // Types
 type User = {
@@ -140,6 +141,7 @@ export default function App() {
               <>
                 <NavItem to="/advertiser" icon={LayoutDashboard} label="Dashboard" />
                 <NavItem to="/advertiser/campaigns" icon={TrendingUp} label="Campaigns" />
+                <NavItem to="/advertiser/map-search" icon={Navigation} label="Map Search" />
                 <NavItem to="/advertiser/analytics" icon={BarChart3} label="Analytics" />
                 <NavItem to="/advertiser/wallet" icon={Wallet} label="Wallet" />
               </>
@@ -199,7 +201,8 @@ export default function App() {
             } />
             <Route path="/setup-admin" element={<AdminSetup />} />
             <Route path="/admin/login" element={<AdminLogin />} />
-            <Route path="/advertiser/*" element={<AdvertiserDashboard user={user} />} />
+            <Route path="/advertiser/*" element={<AdvertiserDashboard user={user} setUser={setUser} />} />
+            <Route path="/advertiser/map-search" element={<MapSearch />} />
             <Route path="/driver/*" element={<DriverPortal user={user} />} />
             <Route path="/admin/*" element={<AdminPanel user={user} />} />
             <Route path="/player" element={<AdPlayer />} />

@@ -1,31 +1,31 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap');
 @import "tailwindcss";
 
-@layer base {
-  html {
-    scroll-behavior: smooth;
-  }
-}
-
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
-  --color-primary: #facc15; /* yellow-400 */
+  --color-brand-yellow: #FFD700;
+  --color-brand-black: #000000;
 }
 
 body {
-  @apply bg-black text-zinc-100 antialiased;
+  @apply bg-zinc-950 text-zinc-100 antialiased;
+  font-family: 'Inter', system-ui, sans-serif;
 }
 
-/* Custom scrollbar */
+.glass-card {
+  @apply bg-zinc-900/50 backdrop-blur-xl border border-white/5 rounded-[32px];
+}
+
+.brand-button {
+  @apply bg-brand-yellow text-brand-black px-8 py-4 rounded-2xl font-black uppercase tracking-tight hover:scale-105 active:scale-95 transition-all;
+}
+
 ::-webkit-scrollbar {
   width: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-zinc-950;
+  @apply bg-zinc-900;
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-zinc-800 rounded-full hover:bg-zinc-700 transition-colors;
+  @apply bg-brand-yellow/20 rounded-full hover:bg-brand-yellow/40 transition-colors;
 }

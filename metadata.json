@@ -1,5 +1,8 @@
 {
   "name": "DanfoDrive",
-  "description": "Programmatic Transit Ad-Network connecting advertisers to commercial vehicle drivers in Nigeria. Includes a secure Admin Portal for system management.",
-  "requestFramePermissions": []
+  "description": "Programmatic Digital Out-of-Home (pDOOH) transit ad-network for Nigerian public transport.",
+  "requestFramePermissions": [
+    "geolocation",
+    "camera"
+  ]
 }

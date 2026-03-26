@@ -1,211 +1,123 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { Shield, Lock, Mail, Loader2, AlertCircle, ChevronLeft, UserPlus, CheckCircle2 } from 'lucide-react';
+import { ShieldCheck, Mail, Lock, User, ChevronRight, Monitor, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import api from '../services/api';
 
-const AdminSetup: React.FC = () => {
+export default function AdminSetup() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
-  const [setupDone, setSetupDone] = useState(false);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const checkSetup = async () => {
-      try {
-        // We can't directly check the count from client easily without a specific endpoint
-        // but we can try to call a "check" endpoint or just let the first attempt fail.
-        // For better UX, let's assume the backend check is enough.
-        // However, we can add a small hint if the table is missing.
-      } catch (e) {
-        console.error('Setup check failed', e);
-      }
-    };
-    checkSetup();
-  }, []);
-
-  const handleSetup = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
     setError('');
 
-    // 1. Basic Gmail validation
-    if (!email.endsWith('@gmail.com')) {
-      setError('Only Gmail accounts allowed');
-      return;
-    }
-
+    // 1. Basic validation
     if (password.length < 8) {
       setError('Password must be at least 8 characters');
       return;
     }
 
-    setLoading(true);
-
     try {
-      await api.post('/admin/setup', { email, password, name });
-      setSuccess(true);
-      setTimeout(() => {
-        navigate('/admin/login');
-      }, 3000);
-    } catch (err: any) {
-      const message = err.response?.data?.error || 'Setup failed. An admin might already exist.';
-      setError(message);
+      const response = await fetch('/api/admin/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, name }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setSuccess(true);
+        setTimeout(() => navigate('/admin/login'), 2000);
+      } else {
+        setError(data.error || 'Setup failed');
+      }
+    } catch (err) {
+      setError('Connection failed');
     } finally {
       setLoading(false);
     }
   };
 
-  if (success) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center p-6 font-sans">
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="bg-zinc-900 border border-white/10 p-12 rounded-[3rem] text-center max-w-md shadow-2xl"
-        >
-          <div className="w-20 h-20 bg-emerald-500 rounded-full flex items-center justify-center mx-auto mb-8 shadow-lg shadow-emerald-500/20">
-            <CheckCircle2 className="text-black" size={40} />
-          </div>
-          <h2 className="text-3xl font-black text-white tracking-tighter mb-4">Setup Complete</h2>
-          <p className="text-zinc-500 font-medium mb-8">
-            Your admin account has been created successfully. Redirecting to login...
-          </p>
-          <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
-            <motion.div 
-              initial={{ width: 0 }}
-              animate={{ width: '100%' }}
-              transition={{ duration: 3 }}
-              className="h-full bg-emerald-500"
-            />
-          </div>
-        </motion.div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center p-6 font-sans">
-      {/* Background Accents */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-yellow-400/10 rounded-full blur-[120px]" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-yellow-400/5 rounded-full blur-[120px]" />
-      </div>
-
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md relative z-10"
+    <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-6">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        className="w-full max-w-lg bg-zinc-900 rounded-[40px] border border-white/10 overflow-hidden shadow-2xl"
       >
-        <button 
-          onClick={() => navigate('/')}
-          className="flex items-center gap-2 text-zinc-500 hover:text-white transition-colors mb-8 font-bold text-sm uppercase tracking-widest"
-        >
-          <ChevronLeft size={18} /> Back to Site
-        </button>
-
-        <div className="bg-zinc-900 border border-white/10 p-10 rounded-[2.5rem] shadow-2xl">
-          <div className="flex flex-col items-center mb-10">
-            <div className="w-16 h-16 bg-yellow-400 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-yellow-400/20">
-              <UserPlus className="text-black" size={32} />
+        <div className="p-10">
+          <div className="flex items-center gap-3 mb-10">
+            <div className="w-10 h-10 bg-brand-yellow rounded-xl flex items-center justify-center">
+              <ShieldCheck className="w-6 h-6 text-brand-black" />
             </div>
-            <h1 className="text-3xl font-black text-white tracking-tighter text-center">
-              Initial Admin Setup
-            </h1>
-            <p className="text-zinc-500 text-sm mt-2 font-medium text-center">
-              Create the master administrator account for DanfoDrive
-            </p>
+            <span className="font-black text-2xl tracking-tighter uppercase">DanfoDrive Admin</span>
           </div>
+
+          <h2 className="text-4xl font-black uppercase tracking-tighter mb-2">System Setup</h2>
+          <p className="text-zinc-500 mb-8 font-medium">Create the master administrator account for the network.</p>
 
           {error && (
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="mb-8 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center gap-3 text-red-400 text-xs font-bold uppercase tracking-widest"
-            >
-              <AlertCircle size={18} />
-              {error}
-            </motion.div>
+            <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center gap-3 text-red-500 text-sm font-bold mb-8">
+              <AlertCircle className="w-5 h-5" /> {error}
+            </div>
           )}
 
-          <form onSubmit={handleSetup} className="space-y-6">
-            <div>
-              <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-3 block ml-1">
-                Full Name
-              </label>
-              <input 
-                type="text" 
+          {success && (
+            <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-2xl flex items-center gap-3 text-green-500 text-sm font-bold mb-8">
+              <ShieldCheck className="w-5 h-5" /> Admin created successfully! Redirecting...
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="relative">
+              <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
+              <input
+                type="text"
+                placeholder="Admin Full Name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full bg-black border border-white/10 rounded-2xl px-6 py-4 text-white focus:border-yellow-400 outline-none transition-all placeholder:text-zinc-700"
-                placeholder="Super Admin"
+                className="w-full bg-black border border-white/10 rounded-2xl pl-12 pr-6 py-4 text-white focus:border-brand-yellow outline-none transition-all placeholder:text-zinc-700"
+                required
+              />
+            </div>
+            <div className="relative">
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
+              <input
+                type="email"
+                placeholder="admin@gmail.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full bg-black border border-white/10 rounded-2xl pl-12 pr-6 py-4 text-white focus:border-brand-yellow outline-none transition-all placeholder:text-zinc-700"
+                required
+              />
+            </div>
+            <div className="relative">
+              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
+              <input
+                type="password"
+                placeholder="Master Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full bg-black border border-white/10 rounded-2xl pl-12 pr-6 py-4 text-white focus:border-brand-yellow outline-none transition-all placeholder:text-zinc-700"
                 required
               />
             </div>
 
-            <div>
-              <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-3 block ml-1">
-                Admin Email (Gmail Only)
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-500" size={20} />
-                <input 
-                  type="email" 
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-black border border-white/10 rounded-2xl pl-14 pr-6 py-4 text-white focus:border-yellow-400 outline-none transition-all placeholder:text-zinc-700"
-                  placeholder="admin@gmail.com"
-                  required
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-3 block ml-1">
-                Master Password
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-500" size={20} />
-                <input 
-                  type="password" 
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-black border border-white/10 rounded-2xl pl-14 pr-6 py-4 text-white focus:border-yellow-400 outline-none transition-all placeholder:text-zinc-700"
-                  placeholder="••••••••"
-                  required
-                />
-              </div>
-            </div>
-
-            <button 
+            <button
               type="submit"
               disabled={loading}
-              className="w-full bg-yellow-400 text-black py-5 rounded-2xl font-black text-lg mt-4 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:hover:scale-100 shadow-xl shadow-yellow-400/10 flex items-center justify-center gap-3"
+              className="w-full bg-brand-yellow text-brand-black py-4 rounded-2xl font-black uppercase tracking-tight text-lg hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 mt-4 disabled:opacity-50"
             >
-              {loading ? (
-                <>
-                  <Loader2 className="animate-spin" size={24} />
-                  Creating Account...
-                </>
-              ) : (
-                'Create Admin Account'
-              )}
+              {loading ? 'Initializing...' : 'Initialize System'} <ChevronRight className="w-5 h-5" />
             </button>
           </form>
-        </div>
-
-        <div className="mt-10 p-6 bg-yellow-400/5 border border-yellow-400/10 rounded-3xl text-center">
-          <p className="text-[10px] font-black text-yellow-400 uppercase tracking-widest mb-2">Security Note</p>
-          <p className="text-xs text-zinc-500 font-medium">
-            This setup page is only available until the first admin account is created. Once set, it will be disabled.
-          </p>
         </div>
       </motion.div>
     </div>
   );
-};
-
-export default AdminSetup;
+}

@@ -1,1045 +1,217 @@
 import React, { useState, useEffect } from 'react';
+import { motion } from 'motion/react';
 import { 
-  LayoutDashboard, Megaphone, Wallet, History, Plus, 
-  Upload, MapPin, Clock, ChevronRight, Eye, QrCode, 
-  TrendingUp, ArrowUpRight, ShieldCheck, CreditCard, Zap,
-  BarChart3, Settings, LogOut, Bell, Search, Filter,
-  Play, Pause, Edit3, Trash2, CheckCircle2, AlertCircle,
-  Truck, Users, Timer, DollarSign, Lock, Activity, Map as MapIcon, Info, X
+  TrendingUp, 
+  Users, 
+  MousePointer2, 
+  Wallet, 
+  Plus, 
+  Search, 
+  Filter, 
+  MoreVertical, 
+  MapPin, 
+  Clock, 
+  ChevronRight, 
+  AlertCircle,
+  BarChart3,
+  PieChart as PieChartIcon,
+  Globe,
+  Zap
 } from 'lucide-react';
-import api from '../services/api';
 import { 
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, 
-  Tooltip, ResponsiveContainer, BarChart, Bar, Cell
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer, 
+  AreaChart, 
+  Area 
 } from 'recharts';
-import { motion, AnimatePresence } from 'motion/react';
-import { APIProvider, Map, AdvancedMarker, Pin, InfoWindow, useMap, useMapsLibrary } from '@vis.gl/react-google-maps';
-import { searchWithAiMaps, MapGroundingResult } from '../services/geminiMapsService';
 
-const API_KEY =
-  process.env.GOOGLE_MAPS_PLATFORM_KEY ||
-  (import.meta as any).env?.VITE_GOOGLE_MAPS_PLATFORM_KEY ||
-  (globalThis as any).GOOGLE_MAPS_PLATFORM_KEY ||
-  '';
-
-const hasValidKey = Boolean(API_KEY) && API_KEY !== 'YOUR_API_KEY' && API_KEY !== 'DUMMY_KEY';
-
-// --- AI Maps Search Component ---
-const AiMapsSearch = () => {
-  const [query, setQuery] = useState('');
-  const [result, setResult] = useState<MapGroundingResult | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-
-  const handleSearch = async () => {
-    if (!query.trim()) return;
-    setIsLoading(true);
-    try {
-      const data = await searchWithAiMaps(query);
-      setResult(data);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-[2rem] p-6 space-y-4">
-      <div className="flex items-center gap-3 mb-2">
-        <div className="p-2 bg-yellow-400/10 text-yellow-400 rounded-xl">
-          <Zap size={20} />
-        </div>
-        <h3 className="text-lg font-black tracking-tight">AI Transit Intelligence</h3>
-      </div>
-      
-      <div className="flex gap-2">
-        <input 
-          type="text" 
-          placeholder="Ask about Lagos transit routes, traffic density, or ad spots..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-          className="flex-1 bg-zinc-800 border-none rounded-xl p-3 text-sm font-bold focus:ring-2 focus:ring-yellow-400"
-        />
-        <button 
-          onClick={handleSearch}
-          disabled={isLoading}
-          className="bg-yellow-400 text-black px-4 py-3 rounded-xl font-black text-sm hover:scale-105 transition-transform disabled:opacity-50"
-        >
-          {isLoading ? 'Thinking...' : 'Search'}
-        </button>
-      </div>
-
-      {result && (
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="space-y-4 pt-4 border-t border-zinc-800"
-        >
-          <div className="text-sm text-zinc-300 leading-relaxed font-medium">
-            {result.text}
-          </div>
-          
-          {result.links.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Verified Locations</p>
-              <div className="flex flex-wrap gap-2">
-                {result.links.map((link, i) => (
-                  <a 
-                    key={i}
-                    href={link.uri}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 px-3 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-xs font-bold text-yellow-400 transition-colors border border-zinc-700"
-                  >
-                    <MapPin size={12} />
-                    {link.title}
-                    <ArrowUpRight size={12} />
-                  </a>
-                ))}
-              </div>
-            </div>
-          )}
-        </motion.div>
-      )}
-    </div>
-  );
-};
-
-// --- Mock Data ---
-const impressionTrendData = [
-  { name: 'Mon', val: 120000 },
-  { name: 'Tue', val: 150000 },
-  { name: 'Wed', val: 110000 },
-  { name: 'Thu', val: 180000 },
-  { name: 'Fri', val: 210000 },
-  { name: 'Sat', val: 190000 },
-  { name: 'Sun', val: 240000 },
+const data = [
+  { name: 'Mon', impressions: 4000, spend: 2400 },
+  { name: 'Tue', impressions: 3000, spend: 1398 },
+  { name: 'Wed', impressions: 2000, spend: 9800 },
+  { name: 'Thu', impressions: 2780, spend: 3908 },
+  { name: 'Fri', impressions: 1890, spend: 4800 },
+  { name: 'Sat', impressions: 2390, spend: 3800 },
+  { name: 'Sun', impressions: 3490, spend: 4300 },
 ];
 
-const spendTrendData = [
-  { name: 'Mon', val: 2500 },
-  { name: 'Tue', val: 3200 },
-  { name: 'Wed', val: 2800 },
-  { name: 'Thu', val: 4100 },
-  { name: 'Fri', val: 4500 },
-  { name: 'Sat', val: 3800 },
-  { name: 'Sun', val: 5200 },
-];
-
-const routeData = [
-  { name: 'Ikeja-CMS', screens: 45, spend: 12000 },
-  { name: 'Lekki-Ajah', screens: 32, spend: 8500 },
-  { name: 'Oshodi-Abule', screens: 60, spend: 15000 },
-  { name: 'Yaba-Oyingbo', screens: 18, spend: 4200 },
-];
-
-// --- Sub-Components ---
-
-const CreateCampaignFlow = ({ setActiveTab, wallet, routes, onRefresh, initialRouteId, setShowDepositModal }: any) => {
-  const userStr = localStorage.getItem('danfodrive_user');
-  const user = (userStr && userStr !== 'undefined') ? JSON.parse(userStr) : {};
-  const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState({
-    name: '',
-    budget: 50000,
-    drivers: 10,
-    routeId: initialRouteId || '',
-    minPerformance: 80,
-    schedule: [{ start: '08:00', end: '10:00' }]
-  });
-
-  const [isLaunching, setIsLaunching] = useState(false);
-  const [isPaying, setIsPaying] = useState(false);
-
-  const hasSubscription = wallet?.subscription_tier && wallet.subscription_tier !== 'none';
-
-  const handlePaySubscription = async (tier: string, amount: number) => {
-    setIsPaying(true);
-    try {
-      const res = await api.post('/subscription/pay', { userId: user.id, tier, amount });
-      if (res.status === 200) {
-        await onRefresh();
-      }
-    } finally {
-      setIsPaying(false);
-    }
-  };
-
-  const handleLaunch = async () => {
-    if (!formData.name || !formData.routeId) {
-      alert("Please provide a campaign name and select a route.");
-      return;
-    }
-
-    setIsLaunching(true);
-    try {
-      const res = await api.post('/campaigns', {
-        advertiser_id: user.id,
-        name: formData.name,
-        budget: formData.budget,
-        route_id: formData.routeId,
-        drivers_count: formData.drivers,
-        schedule_json: formData.schedule
-      });
-
-      if (res.status === 200) {
-        await onRefresh();
-        setActiveTab('campaigns');
-      } else {
-        alert(res.data.error || "Failed to launch campaign");
-      }
-    } catch (error: any) {
-      console.error("Launch error:", error);
-      alert(error.response?.data?.error || "An error occurred while launching the campaign.");
-    } finally {
-      setIsLaunching(false);
-    }
-  };
-
-  if (!hasSubscription) {
-    return (
-      <div className="max-w-5xl mx-auto py-12">
-        <div className="text-center mb-16">
-          <div className="inline-flex p-4 bg-yellow-400/10 text-yellow-400 rounded-3xl mb-6">
-            <Lock size={48} />
-          </div>
-          <h2 className="text-5xl font-black tracking-tighter mb-4">Subscription Required</h2>
-          <p className="text-zinc-500 text-lg max-w-2xl mx-auto">
-            You must have an active monthly platform access plan to create and run ad campaigns on DanfoDrive.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {[
-            { id: 'starter', name: 'Starter', price: 50000, drivers: 20, color: 'zinc' },
-            { id: 'growth', name: 'Growth', price: 150000, drivers: 100, color: 'yellow' },
-            { id: 'enterprise', name: 'Enterprise', price: 500000, drivers: 'Unlimited', color: 'emerald' }
-          ].map((plan) => (
-            <div key={plan.id} className={`bg-zinc-900 border ${plan.id === 'growth' ? 'border-yellow-400 shadow-2xl shadow-yellow-400/5' : 'border-zinc-800'} rounded-[2.5rem] p-10 flex flex-col`}>
-              <h3 className="text-2xl font-black mb-2">{plan.name}</h3>
-              <div className="flex items-baseline gap-1 mb-6">
-                <span className="text-4xl font-black">₦{plan.price.toLocaleString()}</span>
-                <span className="text-zinc-500 font-bold">/mo</span>
-              </div>
-              
-              <ul className="space-y-4 mb-10 flex-1">
-                <li className="flex items-center gap-3 text-sm font-bold text-zinc-300">
-                  <div className="w-5 h-5 bg-emerald-400/10 text-emerald-400 rounded-full flex items-center justify-center"><Plus size={12} /></div>
-                  Up to {plan.drivers} drivers
-                </li>
-                <li className="flex items-center gap-3 text-sm font-bold text-zinc-300">
-                  <div className="w-5 h-5 bg-emerald-400/10 text-emerald-400 rounded-full flex items-center justify-center"><Plus size={12} /></div>
-                  Route Targeting
-                </li>
-                <li className="flex items-center gap-3 text-sm font-bold text-zinc-300">
-                  <div className="w-5 h-5 bg-emerald-400/10 text-emerald-400 rounded-full flex items-center justify-center"><Plus size={12} /></div>
-                  Real-time Analytics
-                </li>
-              </ul>
-
-              <button 
-                onClick={() => handlePaySubscription(plan.id, plan.price)}
-                disabled={isPaying || (wallet?.balance || 0) < plan.price}
-                className={`w-full py-4 rounded-2xl font-black transition-all ${
-                  plan.id === 'growth' ? 'bg-yellow-400 text-black hover:scale-105' : 'bg-zinc-800 text-white hover:bg-zinc-700'
-                } disabled:opacity-50 disabled:cursor-not-allowed`}
-              >
-                {isPaying ? 'Processing...' : (wallet?.balance || 0) < plan.price ? 'Insufficient Balance' : 'Select Plan'}
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  const dailyMinutes = formData.schedule.length * 120 * formData.drivers; // Simplified: 2h per block
-  const dailyCost = dailyMinutes * 10;
-  const estDuration = Math.floor(formData.budget / dailyCost);
-
-  return (
-    <div className="max-w-4xl mx-auto space-y-8">
-      <div className="flex items-center gap-4 mb-8">
-        <button onClick={() => setActiveTab('campaigns')} className="p-2 hover:bg-zinc-800 rounded-full transition-colors">
-          <ChevronRight className="rotate-180" size={24} />
-        </button>
-        <h2 className="text-3xl font-black tracking-tight">Create New Campaign</h2>
-      </div>
-
-      {/* Step Indicator */}
-      <div className="flex gap-2 mb-12">
-        {[1, 2, 3, 4, 5, 6].map((s) => (
-          <div key={s} className={`h-1.5 flex-1 rounded-full ${step >= s ? 'bg-yellow-400' : 'bg-zinc-800'}`} />
-        ))}
-      </div>
-
-      <motion.div 
-        key={step}
-        initial={{ opacity: 0, x: 20 }}
-        animate={{ opacity: 1, x: 0 }}
-        className="bg-zinc-900 border border-zinc-800 rounded-[2.5rem] p-10 shadow-2xl"
-      >
-        {step === 1 && (
-          <div className="space-y-8">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="p-3 bg-emerald-400/10 text-emerald-400 rounded-2xl"><Megaphone size={32} /></div>
-              <div>
-                <h3 className="text-xl font-bold">Campaign Basics</h3>
-                <p className="text-zinc-500 text-sm">Give your campaign a name and set your initial budget.</p>
-              </div>
-            </div>
-            
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-zinc-400 uppercase tracking-widest">Campaign Name</label>
-                <input 
-                  type="text" 
-                  placeholder="e.g. Indomie Morning Rush"
-                  value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  className="w-full bg-zinc-800 border-none rounded-2xl p-4 text-xl font-bold focus:ring-2 focus:ring-yellow-400"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="p-8 bg-zinc-800/50 rounded-3xl border border-zinc-800">
-                  <p className="text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Available Balance</p>
-                  <p className="text-4xl font-black">₦{(wallet?.balance || 0).toLocaleString()}</p>
-                  <button 
-                    onClick={() => setShowDepositModal(true)}
-                    className="mt-6 w-full py-3 bg-white text-black rounded-xl font-black text-sm hover:bg-yellow-400 transition-colors"
-                  >
-                    Deposit Funds
-                  </button>
-                </div>
-                <div className="space-y-4">
-                  <label className="text-sm font-bold text-zinc-400 uppercase tracking-widest">Set Campaign Budget</label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-zinc-500">₦</span>
-                    <input 
-                      type="number" 
-                      value={formData.budget}
-                      onChange={(e) => setFormData({...formData, budget: Number(e.target.value)})}
-                      className="w-full bg-zinc-800 border-none rounded-2xl p-4 pl-8 text-xl font-bold focus:ring-2 focus:ring-yellow-400"
-                    />
-                  </div>
-                  <p className="text-xs text-zinc-500">Estimated duration: <span className="text-yellow-400 font-bold">{estDuration} days</span></p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {step === 2 && (
-          <div className="space-y-8">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="p-3 bg-blue-400/10 text-blue-400 rounded-2xl"><Upload size={32} /></div>
-              <div>
-                <h3 className="text-xl font-bold">Upload Campaign Media</h3>
-                <p className="text-zinc-500 text-sm">Supported formats: MP4, MP3, WAV (Max 15s)</p>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="border-2 border-dashed border-zinc-800 rounded-3xl p-12 text-center hover:border-yellow-400/50 transition-colors cursor-pointer group">
-                <Play size={48} className="mx-auto mb-4 text-zinc-700 group-hover:text-yellow-400 transition-colors" />
-                <p className="font-bold">Upload Video Ad</p>
-                <p className="text-xs text-zinc-500 mt-2">1920x1080 • MP4</p>
-              </div>
-              <div className="border-2 border-dashed border-zinc-800 rounded-3xl p-12 text-center hover:border-yellow-400/50 transition-colors cursor-pointer group">
-                <Bell size={48} className="mx-auto mb-4 text-zinc-700 group-hover:text-yellow-400 transition-colors" />
-                <p className="font-bold">Upload Audio Ad</p>
-                <p className="text-xs text-zinc-500 mt-2">High Quality • MP3/WAV</p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {step === 3 && (
-          <div className="space-y-8">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="p-3 bg-yellow-400/10 text-yellow-400 rounded-2xl"><MapPin size={32} /></div>
-              <div>
-                <h3 className="text-xl font-bold">Route Targeting</h3>
-                <p className="text-zinc-500 text-sm">Select routes where your ads will be triggered.</p>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-1 gap-4">
-              {routes.map((r: any) => (
-                <button 
-                  key={r.id}
-                  onClick={() => setFormData({...formData, routeId: r.id})}
-                  className={`p-6 rounded-2xl border text-left transition-all flex items-center justify-between ${
-                    formData.routeId === r.id ? 'bg-yellow-400/10 border-yellow-400' : 'bg-zinc-800/50 border-zinc-800 hover:border-zinc-700'
-                  }`}
-                >
-                  <div>
-                    <h4 className="font-bold">{r.name}</h4>
-                    <p className="text-xs text-zinc-500">{r.city} • {r.available_vehicles} Vehicles Available</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs font-black uppercase tracking-widest text-zinc-500">Est. Reach</p>
-                    <p className="font-bold text-yellow-400">{r.est_passengers_daily.toLocaleString()}/day</p>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {step === 4 && (
-          <div className="space-y-8">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="p-3 bg-purple-400/10 text-purple-400 rounded-2xl"><Users size={32} /></div>
-              <div>
-                <h3 className="text-xl font-bold">Driver Selection</h3>
-                <p className="text-zinc-500 text-sm">Choose how many drivers will run your campaign.</p>
-              </div>
-            </div>
-            
-            <div className="space-y-6">
-              <div className="flex justify-between mb-2">
-                <label className="text-sm font-bold text-zinc-400 uppercase tracking-widest">Number of Drivers</label>
-                <span className="text-yellow-400 font-black text-2xl">{formData.drivers}</span>
-              </div>
-              <input 
-                type="range" 
-                min="1" 
-                max="100" 
-                value={formData.drivers}
-                onChange={(e) => setFormData({...formData, drivers: Number(e.target.value)})}
-                className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-yellow-400"
-              />
-
-              <div className="pt-8 space-y-4">
-                <div className="flex justify-between items-center">
-                  <label className="text-sm font-bold text-zinc-400 uppercase tracking-widest">Min. Performance Score</label>
-                  <span className="text-emerald-400 font-black text-xl">{formData.minPerformance}%</span>
-                </div>
-                <input 
-                  type="range" 
-                  min="0" 
-                  max="100" 
-                  step="5"
-                  value={formData.minPerformance}
-                  onChange={(e) => setFormData({...formData, minPerformance: Number(e.target.value)})}
-                  className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-emerald-400"
-                />
-                <p className="text-xs text-zinc-500">Only drivers with a score above {formData.minPerformance} will be invited to this campaign.</p>
-              </div>
-
-              <div className="p-6 bg-zinc-800/30 rounded-2xl border border-zinc-800 flex items-center gap-4">
-                <ShieldCheck className="text-emerald-400" size={20} />
-                <p className="text-sm text-zinc-400">
-                  Prioritizing high-performance drivers ensures better ad completion and route compliance.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {step === 5 && (
-          <div className="space-y-8">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="p-3 bg-orange-400/10 text-orange-400 rounded-2xl"><Timer size={32} /></div>
-              <div>
-                <h3 className="text-xl font-bold">Campaign Schedule</h3>
-                <p className="text-zinc-500 text-sm">Select time blocks for ad playback.</p>
-              </div>
-            </div>
-            
-            <div className="space-y-4">
-              {formData.schedule.map((s, i) => (
-                <div key={i} className="flex gap-4 items-center">
-                  <div className="flex-1 grid grid-cols-2 gap-4">
-                    <div className="relative">
-                      <Clock className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={16} />
-                      <input type="time" value={s.start} className="w-full bg-zinc-800 border-none rounded-xl p-3 pl-10 font-bold" />
-                    </div>
-                    <div className="relative">
-                      <Clock className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={16} />
-                      <input type="time" value={s.end} className="w-full bg-zinc-800 border-none rounded-xl p-3 pl-10 font-bold" />
-                    </div>
-                  </div>
-                  <button className="p-3 text-zinc-500 hover:text-red-500"><Trash2 size={20} /></button>
-                </div>
-              ))}
-              <button 
-                onClick={() => setFormData({...formData, schedule: [...formData.schedule, {start: '12:00', end: '14:00'}]})}
-                className="w-full py-4 border-2 border-dashed border-zinc-800 rounded-2xl text-zinc-500 font-bold hover:border-yellow-400/50 hover:text-yellow-400 transition-all flex items-center justify-center gap-2"
-              >
-                <Plus size={18} /> Add Time Block
-              </button>
-            </div>
-          </div>
-        )}
-
-        {step === 6 && (
-          <div className="space-y-8">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="p-3 bg-yellow-400 text-black rounded-2xl"><BarChart3 size={32} /></div>
-              <div>
-                <h3 className="text-xl font-bold">Cost Calculator & Review</h3>
-                <p className="text-zinc-500 text-sm">Review your campaign metrics before launching.</p>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="space-y-6">
-                <div className="flex justify-between border-b border-zinc-800 pb-4">
-                  <span className="text-zinc-500">Total Daily Minutes</span>
-                  <span className="font-bold">{dailyMinutes.toLocaleString()} mins</span>
-                </div>
-                <div className="flex justify-between border-b border-zinc-800 pb-4">
-                  <span className="text-zinc-500">Cost per Minute</span>
-                  <span className="font-bold text-yellow-400">₦10.00</span>
-                </div>
-                <div className="flex justify-between border-b border-zinc-800 pb-4">
-                  <span className="text-zinc-500">Total Daily Spend</span>
-                  <span className="font-bold text-xl">₦{dailyCost.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between border-b border-zinc-800 pb-4">
-                  <span className="text-zinc-500">Est. Campaign Duration</span>
-                  <span className="font-bold text-emerald-400">{estDuration} Days</span>
-                </div>
-              </div>
-
-              <div className="bg-yellow-400 rounded-3xl p-8 text-black flex flex-col justify-center items-center text-center">
-                <p className="text-xs font-black uppercase tracking-widest opacity-60 mb-2">Estimated Monthly Impressions</p>
-                <p className="text-5xl font-black tracking-tighter">{(dailyMinutes * 4 * 30).toLocaleString()}</p>
-                <p className="mt-4 text-sm font-bold opacity-80">Based on avg. 4 passengers per minute</p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className="mt-12 flex justify-between">
-          <button 
-            onClick={() => setStep(Math.max(1, step - 1))}
-            disabled={isLaunching}
-            className={`px-8 py-4 font-bold text-zinc-500 hover:text-white transition-colors ${step === 1 ? 'invisible' : ''}`}
-          >
-            Back
-          </button>
-          <button 
-            onClick={() => step === 6 ? handleLaunch() : setStep(step + 1)}
-            disabled={isLaunching}
-            className="bg-yellow-400 text-black px-12 py-4 rounded-2xl font-black text-lg hover:scale-105 transition-transform disabled:opacity-50"
-          >
-            {isLaunching ? 'Launching...' : step === 6 ? 'Launch Campaign' : 'Next Step'}
-          </button>
-        </div>
-      </motion.div>
-    </div>
-  );
-};
-
-// --- Smart Route Heatmap Component ---
-
-const RouteHeatmap = ({ routes, onSelectRoute, selectedRoute }: any) => {
-  const map = useMap();
-  
-  return (
-    <div className="relative w-full h-full bg-zinc-950 rounded-3xl overflow-hidden border border-zinc-800">
-      {hasValidKey ? (
-        <Map
-          defaultCenter={{ lat: 6.5244, lng: 3.3792 }}
-          defaultZoom={11}
-          mapId="DANFO_DRIVE_MAP"
-          internalUsageAttributionIds={['gmp_mcp_codeassist_v1_aistudio']}
-          style={{ width: '100%', height: '100%' }}
-          gestureHandling={'greedy'}
-          disableDefaultUI={true}
-        >
-          {routes.map((route: any) => {
-            let coords = [];
-            try {
-              coords = JSON.parse(route.coordinates || "[]");
-            } catch (e) {
-              return null;
-            }
-            if (coords.length === 0) return null;
-            
-            const position = { lat: coords[0][0], lng: coords[0][1] };
-            const color = route.current_density === 'high' ? '#ef4444' : route.current_density === 'medium' ? '#facc15' : '#22c55e';
-            
-            return (
-              <AdvancedMarker
-                key={route.id}
-                position={position}
-                onClick={() => onSelectRoute(route)}
-              >
-                <Pin background={color} glyphColor="#fff" borderColor="white" />
-              </AdvancedMarker>
-            );
-          })}
-        </Map>
-      ) : (
-        <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center space-y-4 bg-zinc-900/50">
-          <div className="w-16 h-16 bg-zinc-800 rounded-2xl flex items-center justify-center text-zinc-500">
-            <MapIcon size={32} />
-          </div>
-          <div className="space-y-2">
-            <h4 className="text-xl font-black tracking-tight">Interactive Map Offline</h4>
-            <p className="text-zinc-500 text-sm max-w-xs mx-auto">
-              Google Maps API key is missing. Use the AI Transit Intelligence tool below to explore routes and locations.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Legend */}
-      <div className="absolute bottom-6 left-6 bg-zinc-900/80 backdrop-blur-md p-4 rounded-2xl border border-zinc-800 space-y-2 z-10">
-        <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2">Passenger Density</p>
-        <div className="flex items-center gap-3">
-          <div className="w-3 h-3 rounded-full bg-red-500 shadow-lg shadow-red-500/20" />
-          <span className="text-xs font-bold">High Density</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="w-3 h-3 rounded-full bg-yellow-400 shadow-lg shadow-yellow-400/20" />
-          <span className="text-xs font-bold">Medium Density</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-lg shadow-emerald-500/20" />
-          <span className="text-xs font-bold">Low Density</span>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const StatRow = ({ label, value, icon: Icon }: any) => (
-  <div className="flex items-center justify-between py-3 border-b border-zinc-800 last:border-0">
-    <div className="flex items-center gap-3 text-zinc-400">
-      <Icon size={16} />
-      <span className="text-xs font-bold uppercase tracking-widest">{label}</span>
-    </div>
-    <span className="text-sm font-black text-white">{value}</span>
-  </div>
-);
-
-const SmartRoutes = ({ routes, selectedRoute, setSelectedRoute, setActiveTab, setInitialRouteId }: any) => {
-  const [filterCity, setFilterCity] = useState('All Cities');
-  const [filterType, setFilterType] = useState('All Types');
-  const [filterTime, setFilterTime] = useState('Morning Peak');
-
-  const filteredRoutes = routes.filter(r => 
-    (filterCity === 'All Cities' || r.city === filterCity) &&
-    (filterType === 'All Types' || r.transport_type === filterType)
-  ).map(r => {
-    // Mock density logic based on time of day
-    let density = r.current_density;
-    if (filterTime === 'Morning Peak') {
-      if (r.name?.includes('Ikeja') || r.name?.includes('Oshodi') || r.name?.includes('Gwarinpa') || r.name?.includes('Aba Road') || r.name?.includes('Ring Road') || r.name?.includes('Asaba')) density = 'high';
-      else density = 'medium';
-    } else if (filterTime === 'Evening Peak') {
-      if (r.name?.includes('CMS') || r.name?.includes('Lekki') || r.name?.includes('Maitama') || r.name?.includes('Mile 1') || r.name?.includes('UNIBEN') || r.name?.includes('Onitsha')) density = 'high';
-      else density = 'medium';
-    } else if (filterTime === 'Off-Peak') {
-      density = 'low';
-    }
-    return { ...r, current_density: density };
-  });
-
-  return (
-    <div className="h-full flex flex-col gap-8 p-8 overflow-hidden">
-      <div className="flex justify-between items-end">
-        <div>
-          <h1 className="text-4xl font-black tracking-tighter mb-2">SMART ROUTES</h1>
-          <p className="text-zinc-500 font-medium">Real-time passenger density & route analytics heatmap.</p>
-        </div>
-        <div className="flex gap-4">
-          <select 
-            value={filterCity}
-            onChange={(e) => setFilterCity(e.target.value)}
-            className="bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2 text-sm font-bold outline-none focus:border-yellow-400 transition-colors"
-          >
-            <option>All Cities</option>
-            <option>Lagos</option>
-            <option>Abuja</option>
-            <option>Port Harcourt</option>
-            <option>Benin City</option>
-            <option>Asaba</option>
-            <option>Warri</option>
-          </select>
-          <select 
-            value={filterType}
-            onChange={(e) => setFilterType(e.target.value)}
-            className="bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2 text-sm font-bold outline-none focus:border-yellow-400 transition-colors"
-          >
-            <option>All Types</option>
-            <option>Danfo</option>
-            <option>Taxi</option>
-            <option>Bus</option>
-          </select>
-          <select 
-            value={filterTime}
-            onChange={(e) => setFilterTime(e.target.value)}
-            className="bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2 text-sm font-bold outline-none focus:border-yellow-400 transition-colors"
-          >
-            <option>Morning Peak</option>
-            <option>Mid-Day</option>
-            <option>Evening Peak</option>
-            <option>Off-Peak</option>
-          </select>
-        </div>
-      </div>
-
-      <div className="flex-1 flex flex-col gap-6 min-h-0">
-        {/* AI Maps Search Integration */}
-        <AiMapsSearch />
-
-        <div className="flex-1 flex gap-8 min-h-0">
-          {/* Map Area */}
-          <div className="flex-1 min-h-0">
-            <RouteHeatmap 
-              routes={filteredRoutes} 
-              onSelectRoute={setSelectedRoute} 
-              selectedRoute={selectedRoute} 
-            />
-          </div>
-
-        {/* Info Panel */}
-        <div className="w-96 bg-zinc-900 border border-zinc-800 rounded-3xl p-8 flex flex-col overflow-y-auto">
-          {selectedRoute ? (
-            <motion.div 
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="space-y-8"
-            >
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest ${
-                    selectedRoute.current_density === 'high' ? 'bg-red-500/10 text-red-500' :
-                    selectedRoute.current_density === 'medium' ? 'bg-yellow-400/10 text-yellow-400' :
-                    'bg-emerald-500/10 text-emerald-500'
-                  }`}>
-                    {selectedRoute.current_density} Density
-                  </span>
-                  <span className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 text-[10px] font-black uppercase tracking-widest">
-                    {selectedRoute.transport_type}
-                  </span>
-                </div>
-                <h2 className="text-2xl font-black tracking-tight">{selectedRoute.name}</h2>
-                <p className="text-zinc-500 text-sm font-medium">{selectedRoute.city}</p>
-              </div>
-
-              <div className="space-y-1">
-                <StatRow label="Avg Passengers / Hr" value={selectedRoute.avg_passengers_per_hour?.toLocaleString()} icon={Users} />
-                <StatRow label="Daily Impressions" value={selectedRoute.est_passengers_daily?.toLocaleString()} icon={Eye} />
-                <StatRow label="Active Vehicles" value={selectedRoute.available_vehicles} icon={Truck} />
-                <StatRow label="Peak Hours" value={selectedRoute.peak_hours} icon={Clock} />
-                <StatRow label="Route Duration" value={`${selectedRoute.duration_mins} mins`} icon={Timer} />
-                <StatRow label="Cost / Minute" value={`₦${selectedRoute.cost_per_minute}`} icon={DollarSign} />
-              </div>
-
-              <div className="p-6 bg-zinc-800/30 rounded-2xl border border-zinc-800">
-                <div className="flex items-center gap-3 mb-4">
-                  <TrendingUp className="text-yellow-400" size={20} />
-                  <h3 className="text-sm font-bold uppercase tracking-widest">Efficiency Score</h3>
-                </div>
-                <div className="flex items-end gap-2">
-                  <span className="text-3xl font-black text-white">8.4</span>
-                  <span className="text-zinc-500 text-sm font-bold mb-1">/ 10</span>
-                </div>
-                <p className="text-xs text-zinc-500 mt-2">Based on current traffic and passenger engagement.</p>
-              </div>
-
-              <button 
-                onClick={() => {
-                  setInitialRouteId(selectedRoute.id);
-                  setActiveTab('create');
-                }}
-                className="w-full bg-yellow-400 text-black py-4 rounded-2xl font-black text-lg hover:scale-[1.02] transition-transform flex items-center justify-center gap-2"
-              >
-                <Plus size={20} />
-                Add to Campaign
-              </button>
-            </motion.div>
-          ) : (
-            <div className="h-full flex flex-col items-center justify-center text-center space-y-4">
-              <div className="w-16 h-16 bg-zinc-800 rounded-full flex items-center justify-center text-zinc-500">
-                <Info size={32} />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold">Select a Route</h3>
-                <p className="text-sm text-zinc-500">Click on a route on the map to see detailed analytics and passenger density.</p>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  </div>
-);
-};
-
-// --- Components ---
-
-const StatCard = ({ label, value, icon: Icon, trend, color = "yellow" }: any) => (
-  <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl">
-    <div className="flex justify-between items-start mb-4">
-      <div className={`p-2 bg-zinc-800 rounded-lg text-${color}-400`}>
-        <Icon size={24} />
-      </div>
-      {trend && (
-        <span className={`text-xs font-medium text-${color}-400 bg-${color}-400/10 px-2 py-1 rounded-full`}>
-          {trend}
-        </span>
-      )}
-    </div>
-    <h3 className="text-zinc-400 text-sm font-medium mb-1">{label}</h3>
-    <p className="text-2xl font-bold text-zinc-100">{value}</p>
-  </div>
-);
-
-export const AdvertiserDashboard = ({ onLogout }: { onLogout: () => void }) => {
-  const [activeTab, setActiveTab] = useState('overview');
-  const [selectedRoute, setSelectedRoute] = useState<any>(null);
-  const [initialRouteId, setInitialRouteId] = useState<string | null>(null);
-  const [stats, setStats] = useState<any>(null);
+export default function AdvertiserDashboard({ user }: { user: any }) {
   const [campaigns, setCampaigns] = useState<any[]>([]);
-  const [routes, setRoutes] = useState<any[]>([]);
-  const [topDrivers, setTopDrivers] = useState<any[]>([]);
-  const [wallet, setWallet] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [showDepositModal, setShowDepositModal] = useState(false);
-  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
-  const [depositAmount, setDepositAmount] = useState('10000');
-  const [isDepositing, setIsDepositing] = useState(false);
-  const [isChangingPlan, setIsChangingPlan] = useState(false);
-
-  const userStr = localStorage.getItem('danfodrive_user');
-  const user = (userStr && userStr !== 'undefined') ? JSON.parse(userStr) : {};
-
-  const fetchStats = async () => {
-    try {
-      const [statsRes, campaignsRes, routesRes, topDriversRes] = await Promise.all([
-        api.get(`/advertiser/stats/${user.id}`),
-        api.get('/campaigns'),
-        api.get('/routes'),
-        api.get('/advertiser/top-drivers')
-      ]);
-      
-      setStats(statsRes.data);
-      setCampaigns(campaignsRes.data);
-      setRoutes(routesRes.data);
-      setTopDrivers(topDriversRes.data);
-      setWallet({ balance: statsRes.data.wallet_balance, subscription_tier: statsRes.data.subscription_tier, transactions: [] });
-    } catch (err) {
-      console.error("Failed to fetch dashboard data", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDeposit = async () => {
-    setIsDepositing(true);
-    try {
-      await api.post('/wallet/deposit', { amount: Number(depositAmount) });
-      await fetchStats();
-      setShowDepositModal(false);
-    } catch (error: any) {
-      console.error("Deposit error:", error);
-      alert(error.response?.data?.error || "An error occurred during deposit");
-    } finally {
-      setIsDepositing(false);
-    }
-  };
-
-  const handleSubscriptionChange = async (tier: string, amount: number) => {
-    setIsChangingPlan(true);
-    try {
-      await api.post('/subscription/pay', { tier, amount });
-      await fetchStats();
-      setShowSubscriptionModal(false);
-    } catch (error: any) {
-      console.error("Subscription error:", error);
-      alert(error.response?.data?.error || "An error occurred while changing plan");
-    } finally {
-      setIsChangingPlan(false);
-    }
-  };
+  const [stats, setStats] = useState<any>({ totalSpend: 0, totalImpressions: 0, activeCampaigns: 0 });
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    fetchStats();
+    const fetchData = async () => {
+      try {
+        const token = localStorage.getItem('danfo_token');
+        const [campRes, statsRes] = await Promise.all([
+          fetch('/api/campaigns', { headers: { Authorization: `Bearer ${token}` } }),
+          fetch('/api/stats/advertiser', { headers: { Authorization: `Bearer ${token}` } })
+        ]);
+        setCampaigns(await campRes.json());
+        setStats(await statsRes.json());
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchData();
   }, []);
 
-  const renderOverview = () => (
-    <div className="space-y-8">
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard label="Active Screens" value={stats?.activeScreens || 0} icon={Truck} trend="+3" />
-        <StatCard label="Spend Today (Verified)" value={`₦${(stats?.dailySpend || 0).toLocaleString()}`} icon={DollarSign} trend="+12%" />
-        <StatCard label="Verified Impressions" value={(stats?.totalImpressions || 0).toLocaleString()} icon={ShieldCheck} trend="+8.5%" />
-        <StatCard label="Remaining Budget" value={`₦${(stats?.remainingBudget || 0).toLocaleString()}`} icon={Wallet} color="emerald" />
+  return (
+    <div className="p-8 max-w-7xl mx-auto space-y-10">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+        <div>
+          <h1 className="text-4xl font-black uppercase tracking-tighter mb-2">Advertiser Dashboard</h1>
+          <p className="text-zinc-500 font-medium">Welcome back, {user?.full_name}. Here's your campaign overview.</p>
+        </div>
+        <div className="flex gap-4">
+          <button className="bg-white/5 border border-white/10 px-6 py-3 rounded-2xl font-bold hover:bg-white/10 transition-all flex items-center gap-2">
+            <Wallet className="w-5 h-5 text-brand-yellow" /> ₦{user?.wallet_balance?.toLocaleString()}
+          </button>
+          <button className="bg-brand-yellow text-brand-black px-6 py-3 rounded-2xl font-black uppercase tracking-tight hover:scale-105 transition-all flex items-center gap-2">
+            <Plus className="w-5 h-5" /> New Campaign
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Fleet Status Card */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-8">
-          <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-            <Activity size={20} className="text-yellow-400" />
-            Fleet Activity
-          </h2>
-          <div className="space-y-6">
-            <div>
-              <div className="flex justify-between text-sm mb-2">
-                <span className="text-zinc-400">Online Screens</span>
-                <span className="text-emerald-400 font-bold">{stats?.fleetStatus?.online || 0}</span>
-              </div>
-              <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-emerald-400" 
-                  style={{ width: `${(stats?.fleetStatus?.online / (stats?.fleetStatus?.online + stats?.fleetStatus?.offline || 1)) * 100}%` }}
-                />
-              </div>
-            </div>
-            <div>
-              <div className="flex justify-between text-sm mb-2">
-                <span className="text-zinc-400">Offline Screens</span>
-                <span className="text-zinc-500 font-bold">{stats?.fleetStatus?.offline || 0}</span>
-              </div>
-              <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-zinc-600" 
-                  style={{ width: `${(stats?.fleetStatus?.offline / (stats?.fleetStatus?.online + stats?.fleetStatus?.offline || 1)) * 100}%` }}
-                />
-              </div>
-            </div>
-            <div className="pt-4 border-t border-zinc-800">
-              <p className="text-xs text-zinc-500 italic">
-                * Impressions are only verified when screens are online and moving.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Route Performance */}
-        <div className="lg:col-span-2 bg-zinc-900 border border-zinc-800 rounded-3xl p-8">
-          <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-            <MapPin size={20} className="text-yellow-400" />
-            Route Performance
-          </h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="text-zinc-500 text-xs uppercase tracking-wider border-b border-zinc-800">
-                  <th className="pb-4 font-bold">Route Name</th>
-                  <th className="pb-4 font-bold">Verified Plays</th>
-                  <th className="pb-4 font-bold">Est. Reach</th>
-                  <th className="pb-4 font-bold">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-800">
-                {(stats?.routePerformance || []).map((route: any, i: number) => (
-                  <tr key={i} className="text-sm">
-                    <td className="py-4 font-medium">{route.name}</td>
-                    <td className="py-4">{route.impressions.toLocaleString()}</td>
-                    <td className="py-4 font-bold text-yellow-400">{route.reach.toLocaleString()}</td>
-                    <td className="py-4">
-                      <span className="px-2 py-1 bg-emerald-400/10 text-emerald-400 text-[10px] font-bold rounded-full uppercase">High Traffic</span>
-                    </td>
-                  </tr>
-                ))}
-                {(!stats?.routePerformance || stats.routePerformance.length === 0) && (
-                  <tr>
-                    <td colSpan={4} className="py-8 text-center text-zinc-500">No route data available yet</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <StatCard 
+          icon={TrendingUp} 
+          label="Total Spend" 
+          value={`₦${stats.totalSpend?.toLocaleString()}`} 
+          trend="+12.5%" 
+        />
+        <StatCard 
+          icon={Users} 
+          label="Total Impressions" 
+          value={stats.totalImpressions?.toLocaleString()} 
+          trend="+8.2%" 
+        />
+        <StatCard 
+          icon={Zap} 
+          label="Active Campaigns" 
+          value={stats.activeCampaigns} 
+          trend="0" 
+        />
       </div>
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 bg-zinc-900 border border-zinc-800 rounded-3xl p-8">
-          <div className="flex justify-between items-center mb-8">
-            <h2 className="text-xl font-bold">Impressions Trend</h2>
+        <div className="lg:col-span-2 glass-card p-8">
+          <div className="flex items-center justify-between mb-8">
+            <h3 className="text-xl font-black uppercase tracking-tight">Performance Over Time</h3>
             <div className="flex gap-2">
-              <button className="px-3 py-1 bg-zinc-800 rounded-lg text-xs font-bold">7D</button>
-              <button className="px-3 py-1 text-zinc-500 text-xs font-bold">30D</button>
+              <button className="px-3 py-1 rounded-lg bg-brand-yellow text-brand-black text-xs font-bold">Impressions</button>
+              <button className="px-3 py-1 rounded-lg bg-white/5 text-zinc-500 text-xs font-bold">Spend</button>
             </div>
           </div>
-          <div className="h-[300px] w-full min-w-0">
-            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-              <AreaChart data={impressionTrendData}>
+          <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={data}>
                 <defs>
                   <linearGradient id="colorImp" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#facc15" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#facc15" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#FFD700" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#FFD700" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
-                <XAxis dataKey="name" stroke="#71717a" fontSize={10} tickLine={false} axisLine={false} />
-                <YAxis stroke="#71717a" fontSize={10} tickLine={false} axisLine={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+                <XAxis dataKey="name" stroke="#666" fontSize={12} tickLine={false} axisLine={false} />
+                <YAxis stroke="#666" fontSize={12} tickLine={false} axisLine={false} />
                 <Tooltip 
-                  contentStyle={{ backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '12px' }}
+                  contentStyle={{ backgroundColor: '#1A1A1A', border: '1px solid #333', borderRadius: '12px' }}
+                  itemStyle={{ color: '#FFD700' }}
                 />
-                <Area type="monotone" dataKey="val" stroke="#facc15" fillOpacity={1} fill="url(#colorImp)" strokeWidth={3} />
+                <Area type="monotone" dataKey="impressions" stroke="#FFD700" strokeWidth={3} fillOpacity={1} fill="url(#colorImp)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-8">
-          <h2 className="text-xl font-bold mb-8">Top Performance Drivers</h2>
-          <div className="space-y-6">
-            {topDrivers.map((driver, i) => (
-              <div key={i} className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-zinc-800 rounded-full flex items-center justify-center text-xs font-bold">
-                    {driver.name.charAt(0)}
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold">{driver.name}</p>
-                    <p className="text-[10px] text-zinc-500 uppercase font-black tracking-widest">{driver.rank_category}</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-black text-emerald-400">{driver.overall_score}%</p>
-                  <p className="text-[10px] text-zinc-500 uppercase font-black tracking-widest">Score</p>
-                </div>
+        <div className="glass-card p-8 flex flex-col">
+          <h3 className="text-xl font-black uppercase tracking-tight mb-8">Geofence Reach</h3>
+          <div className="flex-1 flex flex-col items-center justify-center text-center space-y-6">
+            <div className="w-40 h-40 rounded-full border-8 border-brand-yellow/20 border-t-brand-yellow flex items-center justify-center relative">
+              <div className="text-center">
+                <p className="text-3xl font-black">74%</p>
+                <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Ad Fill Rate</p>
               </div>
-            ))}
+            </div>
+            <div className="space-y-4 w-full">
+              <ReachItem label="Ikeja" value="42%" color="bg-brand-yellow" />
+              <ReachItem label="Lekki" value="28%" color="bg-brand-yellow/60" />
+              <ReachItem label="VI" value="15%" color="bg-brand-yellow/30" />
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Recent Campaigns Table */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-3xl overflow-hidden">
-        <div className="p-8 border-b border-zinc-800 flex justify-between items-center">
-          <h2 className="text-xl font-bold">Recent Campaigns</h2>
-          <button onClick={() => setActiveTab('campaigns')} className="text-sm font-bold text-yellow-400 hover:underline">View All</button>
+      {/* Campaign List */}
+      <div className="glass-card overflow-hidden">
+        <div className="p-8 border-b border-white/5 flex items-center justify-between">
+          <h3 className="text-xl font-black uppercase tracking-tight">Active Campaigns</h3>
+          <div className="flex gap-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+              <input 
+                type="text" 
+                placeholder="Search campaigns..." 
+                className="bg-black border border-white/10 rounded-xl pl-10 pr-4 py-2 text-sm outline-none focus:border-brand-yellow transition-all"
+              />
+            </div>
+            <button className="p-2 bg-white/5 rounded-xl border border-white/10 text-zinc-400 hover:text-white transition-all">
+              <Filter className="w-5 h-5" />
+            </button>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left">
-            <thead className="bg-zinc-800/50 text-zinc-500 text-[10px] uppercase font-black tracking-widest">
-              <tr>
+            <thead>
+              <tr className="bg-white/5 text-[10px] font-black uppercase tracking-widest text-zinc-500">
                 <th className="px-8 py-4">Campaign Name</th>
-                <th className="px-8 py-4">Drivers</th>
-                <th className="px-8 py-4">Hours</th>
-                <th className="px-8 py-4">Daily Spend</th>
                 <th className="px-8 py-4">Status</th>
+                <th className="px-8 py-4">Budget</th>
+                <th className="px-8 py-4">CPM</th>
+                <th className="px-8 py-4">Impressions</th>
+                <th className="px-8 py-4"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800">
-              {campaigns.slice(0, 5).map((c) => (
-                <tr key={c.id} className="hover:bg-zinc-800/30 transition-colors">
-                  <td className="px-8 py-4 text-sm font-bold">{c.name}</td>
-                  <td className="px-8 py-4 text-sm">{c.drivers_count} Drivers</td>
-                  <td className="px-8 py-4 text-sm">
-                    {JSON.parse(c.schedule_json || '[]').map((s: any) => `${s.start}-${s.end}`).join(', ')}
+            <tbody className="divide-y divide-white/5">
+              {campaigns.map((camp) => (
+                <tr key={camp.id} className="hover:bg-white/5 transition-all group">
+                  <td className="px-8 py-6">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-brand-yellow/10 flex items-center justify-center text-brand-yellow">
+                        <TrendingUp className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <p className="font-bold">{camp.name}</p>
+                        <p className="text-xs text-zinc-500">{camp.start_date} - {camp.end_date}</p>
+                      </div>
+                    </div>
                   </td>
-                  <td className="px-8 py-4 text-sm font-mono">₦{(c.drivers_count * 10 * 60).toLocaleString()}</td>
-                  <td className="px-8 py-4">
-                    <span className={`px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${
-                      c.status === 'active' ? 'bg-emerald-400/10 text-emerald-400 border-emerald-400/20' : 'bg-zinc-400/10 text-zinc-400 border-zinc-400/20'
+                  <td className="px-8 py-6">
+                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                      camp.status === 'active' ? 'bg-green-500/10 text-green-500' : 'bg-zinc-500/10 text-zinc-500'
                     }`}>
-                      {c.status}
+                      {camp.status}
                     </span>
+                  </td>
+                  <td className="px-8 py-6 font-bold">₦{camp.budget?.toLocaleString()}</td>
+                  <td className="px-8 py-6 text-zinc-400">₦{camp.cpm_rate}</td>
+                  <td className="px-8 py-6 font-bold">{(Math.random() * 10000).toFixed(0)}</td>
+                  <td className="px-8 py-6 text-right">
+                    <button className="p-2 hover:bg-white/10 rounded-lg text-zinc-500 hover:text-white transition-all">
+                      <MoreVertical className="w-5 h-5" />
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -1049,451 +221,35 @@ export const AdvertiserDashboard = ({ onLogout }: { onLogout: () => void }) => {
       </div>
     </div>
   );
+}
 
-  const renderCampaigns = () => (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Campaign Management</h2>
-        <button 
-          onClick={() => setActiveTab('create')}
-          className="bg-yellow-400 text-black px-6 py-3 rounded-xl font-black text-sm flex items-center gap-2 hover:scale-105 transition-transform"
-        >
-          <Plus size={18} /> Create Campaign
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4">
-        {campaigns.map((c) => (
-          <div key={c.id} className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-zinc-800 rounded-2xl flex items-center justify-center text-yellow-400">
-                <Megaphone size={24} />
-              </div>
-              <div>
-                <h3 className="font-bold text-lg">{c.name}</h3>
-                <p className="text-zinc-500 text-xs">Target: {c.route_name || 'All Routes'}</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 flex-1 max-w-2xl">
-              <div>
-                <p className="text-[10px] uppercase font-black text-zinc-500 tracking-widest mb-1">Drivers</p>
-                <p className="font-bold">{c.drivers_count}</p>
-              </div>
-              <div>
-                <p className="text-[10px] uppercase font-black text-zinc-500 tracking-widest mb-1">Duration</p>
-                <p className="font-bold">15s</p>
-              </div>
-              <div>
-                <p className="text-[10px] uppercase font-black text-zinc-500 tracking-widest mb-1">Budget Left</p>
-                <p className="font-mono font-bold text-emerald-400">₦{c.budget_remaining.toLocaleString()}</p>
-              </div>
-              <div>
-                <p className="text-[10px] uppercase font-black text-zinc-500 tracking-widest mb-1">Status</p>
-                <span className={`px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${
-                  c.status === 'active' ? 'bg-emerald-400/10 text-emerald-400 border-emerald-400/20' : 'bg-zinc-400/10 text-zinc-400 border-zinc-400/20'
-                }`}>
-                  {c.status}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex gap-2">
-              <button className="p-3 bg-zinc-800 rounded-xl hover:bg-zinc-700 transition-colors text-zinc-400 hover:text-white">
-                <Edit3 size={18} />
-              </button>
-              <button className="p-3 bg-zinc-800 rounded-xl hover:bg-zinc-700 transition-colors text-zinc-400 hover:text-white">
-                {c.status === 'active' ? <Pause size={18} /> : <Play size={18} />}
-              </button>
-              <button className="p-3 bg-zinc-800 rounded-xl hover:bg-red-500/10 transition-colors text-zinc-400 hover:text-red-500">
-                <Trash2 size={18} />
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-
-  const renderCreateCampaign = () => null;
-
-  const renderWallet = () => (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-      <div className="lg:col-span-2 space-y-8">
-        <div className="bg-zinc-900 border border-zinc-800 rounded-[2.5rem] p-10 relative overflow-hidden">
-          <div className="relative z-10">
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <p className="text-xs font-black uppercase tracking-widest text-zinc-500 mb-1">Available Balance</p>
-                <h2 className="text-6xl font-black tracking-tighter">₦{(wallet?.balance || 0).toLocaleString()}</h2>
-              </div>
-              <div className="text-right">
-                <p className="text-xs font-black uppercase tracking-widest text-zinc-500 mb-1">Current Plan</p>
-                <span className="px-3 py-1 bg-yellow-400 text-black rounded-full text-[10px] font-black uppercase tracking-widest">
-                  {wallet?.subscription_tier || 'None'}
-                </span>
-              </div>
-            </div>
-            <div className="flex gap-4 mt-10">
-              <button 
-                onClick={() => setShowDepositModal(true)}
-                className="bg-yellow-400 text-black px-8 py-4 rounded-2xl font-black text-lg flex items-center gap-2 hover:scale-105 transition-transform"
-              >
-                <Plus size={20} /> Deposit Funds
-              </button>
-              <button 
-                onClick={() => setShowSubscriptionModal(true)}
-                className="bg-zinc-800 text-white px-8 py-4 rounded-2xl font-black text-lg hover:bg-zinc-700 transition-colors"
-              >
-                {wallet?.subscription_tier === 'none' ? 'Upgrade Plan' : 'Manage Subscription'}
-              </button>
-            </div>
-          </div>
-          <div className="absolute top-0 right-0 p-10 opacity-5">
-            <CreditCard size={240} />
-          </div>
-        </div>
-
-        <div className="bg-zinc-900 border border-zinc-800 rounded-3xl overflow-hidden">
-          <div className="p-8 border-b border-zinc-800">
-            <h2 className="text-xl font-bold">Transaction History</h2>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead className="bg-zinc-800/50 text-zinc-500 text-[10px] uppercase font-black tracking-widest">
-                <tr>
-                  <th className="px-8 py-4">Date</th>
-                  <th className="px-8 py-4">Type</th>
-                  <th className="px-8 py-4">Description</th>
-                  <th className="px-8 py-4">Amount</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-800">
-                {wallet?.transactions.map((tx: any) => (
-                  <tr key={tx.id} className="hover:bg-zinc-800/30 transition-colors">
-                    <td className="px-8 py-4 text-sm text-zinc-500">{new Date(tx.timestamp).toLocaleDateString()}</td>
-                    <td className="px-8 py-4">
-                      <span className={`px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${
-                        tx.type === 'deposit' ? 'bg-emerald-400/10 text-emerald-400 border-emerald-400/20' : 'bg-red-400/10 text-red-400 border-red-400/20'
-                      }`}>
-                        {tx.type}
-                      </span>
-                    </td>
-                    <td className="px-8 py-4 text-sm">{tx.description}</td>
-                    <td className={`px-8 py-4 text-sm font-mono font-bold ${tx.type === 'deposit' ? 'text-emerald-400' : 'text-red-400'}`}>
-                      {tx.type === 'deposit' ? '+' : '-'}₦{Math.abs(tx.amount).toLocaleString()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <div className="space-y-8">
-        <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-8">
-          <h3 className="text-xl font-bold mb-6">Subscription Plan</h3>
-          <div className="p-6 bg-yellow-400/10 border border-yellow-400/20 rounded-2xl mb-6">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-yellow-400 font-black uppercase tracking-widest text-xs">Growth Plan</span>
-              <span className="text-zinc-100 font-bold text-sm">₦150,000/mo</span>
-            </div>
-            <p className="text-zinc-400 text-xs leading-relaxed">Up to 100 drivers, route targeting, and advanced analytics included.</p>
-          </div>
-          <button 
-            onClick={() => setShowSubscriptionModal(true)}
-            className="w-full py-3 bg-zinc-800 hover:bg-zinc-700 rounded-xl font-bold text-sm transition-colors"
-          >
-            Upgrade Plan
-          </button>
-        </div>
-
-        <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-8">
-          <h3 className="text-xl font-bold mb-6">Billing Settings</h3>
-          <div className="space-y-4">
-            <div className="flex items-center gap-4 p-4 bg-zinc-800/50 rounded-2xl border border-zinc-800">
-              <CreditCard size={20} className="text-zinc-500" />
-              <div>
-                <p className="text-sm font-bold">•••• 4242</p>
-                <p className="text-[10px] text-zinc-500 uppercase font-black">Expires 12/28</p>
-              </div>
-            </div>
-            <button className="w-full py-3 text-sm font-bold text-zinc-500 hover:text-white transition-colors">
-              Add Payment Method
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
+function StatCard({ icon: Icon, label, value, trend }: { icon: any, label: string, value: string, trend: string }) {
   return (
-    <div className="flex h-screen bg-black text-zinc-100 font-sans overflow-hidden">
-      {/* Sidebar */}
-      <aside className="w-72 border-r border-zinc-800 flex flex-col bg-zinc-950">
-        <div className="p-8">
-          <div className="flex items-center gap-3 mb-12">
-            <div className="w-10 h-10 bg-yellow-400 rounded-xl flex items-center justify-center shadow-lg shadow-yellow-400/20">
-              <span className="text-black font-black text-2xl">D</span>
-            </div>
-            <span className="text-2xl font-black tracking-tighter">DANFODRIVE</span>
-          </div>
-          
-          <nav className="space-y-1">
-            {[
-              { id: 'overview', icon: LayoutDashboard, label: 'Overview' },
-              { id: 'campaigns', icon: Megaphone, label: 'Campaigns' },
-              { id: 'routes', icon: MapIcon, label: 'Smart Routes' },
-              { id: 'create', icon: Plus, label: 'Create Campaign' },
-              { id: 'wallet', icon: Wallet, label: 'Budget Wallet' },
-              { id: 'analytics', icon: BarChart3, label: 'Analytics' },
-              { id: 'billing', icon: CreditCard, label: 'Billing' },
-              { id: 'settings', icon: Settings, label: 'Settings' },
-            ].map((item) => (
-              <button
-                key={item.id}
-                onClick={() => setActiveTab(item.id)}
-                className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-bold transition-all ${
-                  activeTab === item.id 
-                    ? "bg-yellow-400 text-black shadow-xl shadow-yellow-400/10" 
-                    : "text-zinc-500 hover:text-zinc-100 hover:bg-zinc-900"
-                }`}
-              >
-                <item.icon size={20} />
-                {item.label}
-              </button>
-            ))}
-          </nav>
+    <div className="glass-card p-8 group hover:border-brand-yellow/30 transition-all">
+      <div className="flex items-start justify-between mb-6">
+        <div className="w-12 h-12 bg-brand-yellow/10 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+          <Icon className="w-6 h-6 text-brand-yellow" />
         </div>
-        
-        <div className="mt-auto p-8 border-t border-zinc-800">
-          <div className="flex items-center gap-4 mb-6">
-            <div className="w-12 h-12 rounded-2xl bg-zinc-900 border border-zinc-800 overflow-hidden">
-              <img src="https://i.pravatar.cc/150?u=tunde" alt="User" />
-            </div>
-            <div>
-              <p className="text-sm font-black">Tunde Okafor</p>
-              <p className="text-[10px] text-zinc-500 uppercase font-black tracking-widest">Growth Plan</p>
-            </div>
-          </div>
-          <button 
-            onClick={onLogout}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold text-zinc-500 hover:text-red-400 hover:bg-red-400/5 transition-all"
-          >
-            <LogOut size={20} /> Sign Out
-          </button>
-        </div>
-      </aside>
-
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col overflow-hidden">
-        {/* Topbar */}
-        <header className="h-20 border-b border-zinc-800 flex items-center justify-between px-10 bg-black/50 backdrop-blur-xl z-10">
-          <div className="flex items-center gap-4">
-            {activeTab !== 'overview' && (
-              <button 
-                onClick={() => setActiveTab('overview')}
-                className="p-2 hover:bg-zinc-800 rounded-full transition-colors text-zinc-400 hover:text-white"
-              >
-                <ChevronRight className="rotate-180" size={24} />
-              </button>
-            )}
-            <h1 className="text-xl font-black tracking-tight capitalize">{activeTab.replace('-', ' ')}</h1>
-            <div className="h-4 w-px bg-zinc-800 mx-2" />
-            <div className="flex items-center gap-2 text-xs font-bold text-zinc-500">
-              <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
-              Network Live: 142 Screens Online
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-6">
-            <div className="relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
-              <input 
-                type="text" 
-                placeholder="Search campaigns..." 
-                className="bg-zinc-900 border border-zinc-800 rounded-2xl py-2.5 pl-12 pr-6 text-sm focus:outline-none focus:border-yellow-400 transition-colors w-72 font-medium"
-              />
-            </div>
-            <button className="relative p-2.5 bg-zinc-900 border border-zinc-800 rounded-2xl text-zinc-500 hover:text-zinc-100 transition-all">
-              <Bell size={20} />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-yellow-400 rounded-full border-2 border-black" />
-            </button>
-          </div>
-        </header>
-
-        {/* Content Area */}
-        <div className="flex-1 overflow-y-auto p-10 bg-zinc-950/50">
-          <AnimatePresence mode="wait">
-            {loading ? (
-              <div className="h-full flex items-center justify-center">
-                <div className="w-12 h-12 border-4 border-yellow-400 border-t-transparent rounded-full animate-spin" />
-              </div>
-            ) : (
-              <motion.div
-                key={activeTab}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.2 }}
-              >
-                {activeTab === 'overview' && renderOverview()}
-                {activeTab === 'campaigns' && renderCampaigns()}
-                {activeTab === 'routes' && <SmartRoutes 
-                  routes={routes} 
-                  selectedRoute={selectedRoute} 
-                  setSelectedRoute={setSelectedRoute} 
-                  setActiveTab={setActiveTab} 
-                  setInitialRouteId={setInitialRouteId} 
-                />}
-                {activeTab === 'create' && <CreateCampaignFlow 
-                  setActiveTab={setActiveTab} 
-                  wallet={wallet} 
-                  routes={routes} 
-                  onRefresh={fetchStats}
-                  initialRouteId={initialRouteId}
-                  setShowDepositModal={setShowDepositModal}
-                />}
-                {activeTab === 'wallet' && renderWallet()}
-                {activeTab === 'analytics' && renderOverview()} {/* Reusing overview for demo */}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      </main>
-
-      {/* Deposit Modal */}
-      <AnimatePresence>
-        {showDepositModal && (
-          <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-zinc-900 w-full max-w-md rounded-[2.5rem] p-10 border border-zinc-800"
-            >
-              <div className="flex justify-between items-center mb-8">
-                <h2 className="text-2xl font-black">Deposit Funds</h2>
-                <button onClick={() => setShowDepositModal(false)} className="text-zinc-500 hover:text-white">
-                  <X size={24} />
-                </button>
-              </div>
-              
-              <div className="space-y-8">
-                <div>
-                  <label className="text-xs font-black text-zinc-500 uppercase tracking-widest mb-3 block">Amount to Deposit (₦)</label>
-                  <div className="relative">
-                    <span className="absolute left-6 top-1/2 -translate-y-1/2 text-2xl font-black text-zinc-500">₦</span>
-                    <input 
-                      type="number" 
-                      value={depositAmount}
-                      onChange={(e) => setDepositAmount(e.target.value)}
-                      className="w-full bg-zinc-800 border-none rounded-2xl p-6 pl-12 text-3xl font-black focus:ring-2 focus:ring-yellow-400"
-                    />
-                  </div>
-                </div>
-
-                <div className="pt-4 space-y-4">
-                  <button 
-                    onClick={handleDeposit}
-                    disabled={isDepositing || !depositAmount}
-                    className="w-full bg-yellow-400 text-black py-5 rounded-2xl font-black text-lg shadow-lg shadow-yellow-400/10 hover:scale-[1.02] transition-transform disabled:opacity-50"
-                  >
-                    {isDepositing ? 'Processing...' : 'Confirm Deposit'}
-                  </button>
-                  <p className="text-center text-[10px] text-zinc-500 uppercase font-black tracking-widest">
-                    Secure payment via Paystack/Flutterwave
-                  </p>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Subscription Modal */}
-      <AnimatePresence>
-        {showSubscriptionModal && (
-          <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-zinc-900 w-full max-w-4xl rounded-[3rem] p-12 border border-zinc-800 overflow-y-auto max-h-[90vh]"
-            >
-              <div className="flex justify-between items-center mb-12">
-                <div>
-                  <h2 className="text-4xl font-black tracking-tighter mb-2">Manage Subscription</h2>
-                  <p className="text-zinc-500 font-medium">Current Plan: <span className="text-yellow-400 uppercase font-black tracking-widest">{wallet?.subscription_tier}</span></p>
-                </div>
-                <button onClick={() => setShowSubscriptionModal(false)} className="p-3 bg-zinc-800 rounded-2xl text-zinc-500 hover:text-white transition-colors">
-                  <X size={24} />
-                </button>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                {[
-                  { id: 'starter', name: 'Starter', price: 50000, drivers: 20, color: 'zinc' },
-                  { id: 'growth', name: 'Growth', price: 150000, drivers: 100, color: 'yellow' },
-                  { id: 'enterprise', name: 'Enterprise', price: 500000, drivers: 'Unlimited', color: 'emerald' }
-                ].map((plan) => (
-                  <div key={plan.id} className={`bg-zinc-800/50 border ${wallet?.subscription_tier === plan.id ? 'border-yellow-400' : 'border-zinc-800'} rounded-[2.5rem] p-8 flex flex-col relative`}>
-                    {wallet?.subscription_tier === plan.id && (
-                      <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-yellow-400 text-black px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">
-                        Current Plan
-                      </div>
-                    )}
-                    <h3 className="text-xl font-black mb-1">{plan.name}</h3>
-                    <div className="flex items-baseline gap-1 mb-6">
-                      <span className="text-3xl font-black">₦{plan.price.toLocaleString()}</span>
-                      <span className="text-zinc-500 text-xs font-bold">/mo</span>
-                    </div>
-                    
-                    <ul className="space-y-3 mb-8 flex-1">
-                      <li className="flex items-center gap-2 text-xs font-bold text-zinc-400">
-                        <CheckCircle2 size={14} className="text-emerald-400" />
-                        Up to {plan.drivers} drivers
-                      </li>
-                      <li className="flex items-center gap-2 text-xs font-bold text-zinc-400">
-                        <CheckCircle2 size={14} className="text-emerald-400" />
-                        Route Targeting
-                      </li>
-                      <li className="flex items-center gap-2 text-xs font-bold text-zinc-400">
-                        <CheckCircle2 size={14} className="text-emerald-400" />
-                        Real-time Analytics
-                      </li>
-                    </ul>
-
-                    <button 
-                      onClick={() => handleSubscriptionChange(plan.id, plan.price)}
-                      disabled={isChangingPlan || wallet?.subscription_tier === plan.id || (wallet?.balance || 0) < plan.price}
-                      className={`w-full py-4 rounded-2xl font-black text-sm transition-all ${
-                        plan.id === 'growth' ? 'bg-yellow-400 text-black' : 'bg-zinc-700 text-white hover:bg-zinc-600'
-                      } disabled:opacity-50 disabled:cursor-not-allowed`}
-                    >
-                      {isChangingPlan ? 'Processing...' : wallet?.subscription_tier === plan.id ? 'Active' : (wallet?.balance || 0) < plan.price ? 'Insufficient Balance' : 'Switch Plan'}
-                    </button>
-                  </div>
-                ))}
-              </div>
-              
-              <div className="mt-12 p-6 bg-zinc-800/30 rounded-3xl border border-zinc-800 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-zinc-800 rounded-2xl text-zinc-500">
-                    <Info size={24} />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold">Billing Cycle</p>
-                    <p className="text-xs text-zinc-500">Your next billing date is April 16, 2026</p>
-                  </div>
-                </div>
-                <button className="text-sm font-bold text-red-400 hover:underline">Cancel Subscription</button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+        <span className={`text-xs font-black uppercase tracking-widest ${trend.startsWith('+') ? 'text-green-500' : 'text-zinc-500'}`}>
+          {trend}
+        </span>
+      </div>
+      <p className="text-xs font-black text-zinc-500 uppercase tracking-widest mb-1">{label}</p>
+      <p className="text-3xl font-black text-white">{value}</p>
     </div>
   );
-};
+}
+
+function ReachItem({ label, value, color }: { label: string, value: string, color: string }) {
+  return (
+    <div className="space-y-2">
+      <div className="flex justify-between text-xs font-bold uppercase tracking-widest">
+        <span>{label}</span>
+        <span className="text-zinc-500">{value}</span>
+      </div>
+      <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+        <div className={`h-full ${color} rounded-full`} style={{ width: value }} />
+      </div>
+    </div>
+  );
+}

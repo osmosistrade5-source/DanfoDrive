@@ -15,12 +15,26 @@ const JWT_SECRET = process.env.JWT_SECRET || 'danfo_drive_secret_2026';
 app.use(cors());
 app.use(express.json());
 
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 // --- Mock Database (for demo if Supabase not set up) ---
 let users: any[] = [
-  { id: '1', email: 'advertiser@danfodrive.com', password: '$2a$10$xV8.pX.pX.pX.pX.pX.pX.pX', role: 'advertiser', full_name: 'Tunde Okafor', wallet_balance: 50000 },
-  { id: '2', email: 'driver@danfodrive.com', password: '$2a$10$xV8.pX.pX.pX.pX.pX.pX.pX', role: 'driver', full_name: 'Emeka Nwosu', wallet_balance: 12000 },
-  { id: '3', email: 'admin@danfodrive.com', password: '$2a$10$xV8.pX.pX.pX.pX.pX.pX.pX', role: 'admin', full_name: 'Admin User', wallet_balance: 0 },
+  { id: '1', email: 'advertiser@danfodrive.com', password: '', role: 'advertiser', full_name: 'Tunde Okafor', company_name: 'Tunde Ads', wallet_balance: 50000 },
+  { id: '2', email: 'driver@danfodrive.com', password: '', role: 'driver', full_name: 'Emeka Nwosu', wallet_balance: 12000 },
+  { id: '3', email: 'osmosistrade5@gmail.com', password: '', role: 'admin', full_name: 'Michael Dinho', wallet_balance: 0 },
 ];
+
+// Seed passwords with bcrypt
+const seedPasswords = async () => {
+  const salt = await bcrypt.genSalt(10);
+  users[0].password = await bcrypt.hash('password', salt);
+  users[1].password = await bcrypt.hash('password', salt);
+  users[2].password = await bcrypt.hash('Michaeldinho7', salt);
+  console.log('Database seeded with hashed passwords');
+};
+seedPasswords();
 
 let campaigns: any[] = [
   { id: 'c1', advertiser_id: '1', name: 'Indomie Morning Rush', budget: 100000, cpm_rate: 50, status: 'active', start_date: '2026-03-01', end_date: '2026-04-01' },
@@ -55,38 +69,28 @@ const authenticate = (req: any, res: any, next: any) => {
 // --- API Routes ---
 
 // Admin routes
-app.post('/api/admin/setup', async (req, res) => {
-  const { email, password, name } = req.body;
-  
-  // Check if admin already exists
-  const adminExists = users.some(u => u.role === 'admin');
-  if (adminExists) {
-    return res.status(400).json({ error: 'Admin already initialized' });
-  }
-
-  const newAdmin = {
-    id: 'admin-1',
-    email,
-    password, // In real app, hash this
-    role: 'admin' as const,
-    full_name: name,
-    wallet_balance: 0
-  };
-
-  users.push(newAdmin);
-  res.json({ message: 'Admin created successfully' });
-});
-
-app.post('/api/admin/login', (req, res) => {
+app.post('/api/admin/login', async (req, res) => {
   const { email, password } = req.body;
-  const user = users.find(u => u.email === email && u.password === password && u.role === 'admin');
+  const user = users.find(u => u.email === email && u.role === 'admin');
   
   if (!user) {
     return res.status(401).json({ error: 'Invalid admin credentials' });
   }
 
-  const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET);
+  const isMatch = await bcrypt.compare(password, user.password);
+  if (!isMatch) {
+    return res.status(401).json({ error: 'Invalid admin credentials' });
+  }
+
+  const token = jwt.sign({ id: user.id, role: user.role, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
   res.json({ token, user: { id: user.id, email: user.email, role: user.role, full_name: user.full_name } });
+});
+
+app.get('/api/admin/me', authenticate, (req: any, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+  const user = users.find(u => u.id === req.user.id);
+  if (!user) return res.status(404).json({ error: 'Admin not found' });
+  res.json({ id: user.id, email: user.email, role: user.role, full_name: user.full_name });
 });
 
 // Auth
@@ -95,13 +99,94 @@ app.post('/api/auth/login', async (req, res) => {
   const user = users.find(u => u.email === email);
   if (!user) return res.status(400).json({ error: 'User not found' });
   
-  // In a real app, use bcrypt.compare
-  // const valid = await bcrypt.compare(password, user.password);
-  const valid = password === 'password'; // Simple for demo
+  const valid = await bcrypt.compare(password, user.password);
   if (!valid) return res.status(400).json({ error: 'Invalid password' });
 
-  const token = jwt.sign({ id: user.id, role: user.role, email: user.email }, JWT_SECRET);
-  res.json({ token, user: { id: user.id, email: user.email, role: user.role, full_name: user.full_name, wallet_balance: user.wallet_balance } });
+  const token = jwt.sign({ id: user.id, role: user.role, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+  res.json({ token, user: { id: user.id, email: user.email, role: user.role, full_name: user.full_name, company_name: user.company_name, wallet_balance: user.wallet_balance } });
+});
+
+// Advertiser Auth
+app.post('/api/advertisers/register', async (req, res) => {
+  const { email, password, company_name, full_name } = req.body;
+  
+  if (users.find(u => u.email === email)) {
+    return res.status(400).json({ error: 'Email already registered' });
+  }
+
+  if (password.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  }
+
+  const salt = await bcrypt.genSalt(10);
+  const hashedPassword = await bcrypt.hash(password, salt);
+
+  const newUser = {
+    id: `u${Date.now()}`,
+    email,
+    password: hashedPassword,
+    role: 'advertiser',
+    full_name: full_name || company_name,
+    company_name,
+    wallet_balance: 0,
+    created_at: new Date().toISOString()
+  };
+
+  users.push(newUser);
+
+  const token = jwt.sign({ id: newUser.id, role: newUser.role, email: newUser.email }, JWT_SECRET, { expiresIn: '7d' });
+  res.json({ 
+    token, 
+    user: { 
+      id: newUser.id, 
+      email: newUser.email, 
+      role: newUser.role, 
+      full_name: newUser.full_name, 
+      company_name: newUser.company_name, 
+      wallet_balance: newUser.wallet_balance 
+    } 
+  });
+});
+
+app.post('/api/advertisers/login', async (req, res) => {
+  const { email, password } = req.body;
+  const user = users.find(u => u.email === email && u.role === 'advertiser');
+  
+  if (!user) {
+    return res.status(401).json({ error: 'Invalid advertiser credentials' });
+  }
+
+  const isMatch = await bcrypt.compare(password, user.password);
+  if (!isMatch) {
+    return res.status(401).json({ error: 'Invalid advertiser credentials' });
+  }
+
+  const token = jwt.sign({ id: user.id, role: user.role, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+  res.json({ 
+    token, 
+    user: { 
+      id: user.id, 
+      email: user.email, 
+      role: user.role, 
+      full_name: user.full_name, 
+      company_name: user.company_name, 
+      wallet_balance: user.wallet_balance 
+    } 
+  });
+});
+
+app.get('/api/advertisers/me', authenticate, (req: any, res) => {
+  if (req.user.role !== 'advertiser') return res.status(403).json({ error: 'Forbidden' });
+  const user = users.find(u => u.id === req.user.id);
+  if (!user) return res.status(404).json({ error: 'Advertiser not found' });
+  res.json({ 
+    id: user.id, 
+    email: user.email, 
+    role: user.role, 
+    full_name: user.full_name, 
+    company_name: user.company_name, 
+    wallet_balance: user.wallet_balance 
+  });
 });
 
 // Campaigns
@@ -155,12 +240,62 @@ app.post('/api/player/impression', (req, res) => {
   res.json({ success: true });
 });
 
+app.post('/api/devices', authenticate, (req: any, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+  
+  const newDevice = { 
+    ...req.body, 
+    id: `d${devices.length + 1}`, 
+    status: 'offline', 
+    last_heartbeat: new Date().toISOString(),
+    current_lat: 6.5244,
+    current_lng: 3.3792
+  };
+  devices.push(newDevice);
+  res.json(newDevice);
+});
+
 // Stats
+app.get('/api/stats/admin', authenticate, (req: any, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+  
+  const totalSpend = campaigns.reduce((sum, c) => sum + (c.budget || 0), 0);
+  const totalImpressions = impressions.length * 10;
+  const totalDrivers = users.filter(u => u.role === 'driver').length;
+  const totalAdvertisers = users.filter(u => u.role === 'advertiser').length;
+  
+  res.json({ 
+    totalSpend, 
+    totalImpressions, 
+    totalDrivers, 
+    totalAdvertisers,
+    activeCampaigns: campaigns.filter(c => c.status === 'active').length,
+    pendingCampaigns: campaigns.filter(c => c.status === 'pending' || c.status === 'draft').length,
+    onlineDevices: devices.filter(d => d.status === 'online').length
+  });
+});
+
 app.get('/api/stats/advertiser', authenticate, (req: any, res) => {
-  const userCampaigns = campaigns.filter(c => c.advertiser_id === req.user.id);
-  const totalSpend = userCampaigns.reduce((sum, c) => sum + (c.budget - 5000), 0); // Mock spend
-  const totalImpressions = impressions.length * 10; // Mock multiplier
-  res.json({ totalSpend, totalImpressions, activeCampaigns: userCampaigns.filter(c => c.status === 'active').length });
+  const advertiserCampaigns = campaigns.filter(c => c.advertiser_id === req.user.id);
+  const totalSpend = advertiserCampaigns.reduce((sum, c) => sum + (c.budget || 0), 0);
+  const activeCampaigns = advertiserCampaigns.filter(c => c.status === 'active').length;
+  
+  res.json({
+    totalSpend,
+    totalImpressions: Math.floor(totalSpend / 50) * 10, // Mock calculation
+    activeCampaigns
+  });
+});
+
+app.post('/api/admin/campaigns/:id/status', authenticate, (req: any, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+  
+  const { status } = req.body;
+  const campaign = campaigns.find(c => c.id === req.params.id);
+  if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
+  
+  campaign.status = status;
+  res.json(campaign);
 });
 
 // --- Vite Integration ---

@@ -29,9 +29,10 @@ import AdvertiserDashboard from './components/AdvertiserDashboard';
 import DriverPortal from './components/DriverPortal';
 import AdPlayer from './components/AdPlayer';
 import AdminPanel from './components/AdminPanel';
-import AuthModal from './components/AuthModal';
-import AdminSetup from './components/AdminSetup';
 import AdminLogin from './components/AdminLogin';
+import AdvertiserLogin from './components/AdvertiserLogin';
+import AdvertiserSignup from './components/AdvertiserSignup';
+import AuthModal from './components/AuthModal';
 import { MapSearch } from './components/MapSearch';
 
 // Types
@@ -113,7 +114,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex">
       {/* Sidebar - Only for logged in users */}
-      {user && location.pathname !== '/player' && !location.pathname.includes('/admin/login') && !location.pathname.includes('/setup-admin') && (
+      {user && location.pathname !== '/player' && (
         <motion.aside
           initial={false}
           animate={{ width: isSidebarOpen ? 260 : 80 }}
@@ -199,11 +200,12 @@ export default function App() {
                 }} 
               />
             } />
-            <Route path="/setup-admin" element={<AdminSetup />} />
-            <Route path="/admin/login" element={<AdminLogin />} />
+            <Route path="/advertiser/login" element={<AdvertiserLogin onLoginSuccess={setUser} />} />
+            <Route path="/advertiser/signup" element={<AdvertiserSignup onSignupSuccess={setUser} />} />
             <Route path="/advertiser/*" element={<AdvertiserDashboard user={user} setUser={setUser} />} />
             <Route path="/advertiser/map-search" element={<MapSearch />} />
             <Route path="/driver/*" element={<DriverPortal user={user} />} />
+            <Route path="/admin/login" element={<AdminLogin onLoginSuccess={setUser} />} />
             <Route path="/admin/*" element={<AdminPanel user={user} />} />
             <Route path="/player" element={<AdPlayer />} />
           </Routes>

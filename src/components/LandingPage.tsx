@@ -33,19 +33,13 @@ export default function LandingPage({ onLogin }: { onLogin: (role: 'advertiser' 
             <a href="#how-it-works" className="hover:text-white transition-colors">How it Works</a>
             <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
             <button 
-              onClick={() => navigate('/setup-admin')}
-              className="text-yellow-400 hover:text-white transition-colors font-bold"
-            >
-              Setup Admin
-            </button>
-            <button 
-              onClick={() => onLogin('advertiser')}
+              onClick={() => navigate('/advertiser/login')}
               className="hover:text-white transition-colors"
             >
               Login
             </button>
             <button 
-              onClick={() => onLogin('advertiser')}
+              onClick={() => navigate('/advertiser/signup')}
               className="bg-brand-yellow text-brand-black px-6 py-2.5 rounded-full font-bold hover:scale-105 transition-all"
             >
               Launch Campaign
@@ -74,7 +68,7 @@ export default function LandingPage({ onLogin }: { onLogin: (role: 'advertiser' 
             </p>
             <div className="flex flex-wrap gap-4">
               <button 
-                onClick={() => onLogin('advertiser')}
+                onClick={() => navigate('/advertiser/signup')}
                 className="bg-brand-yellow text-brand-black px-8 py-4 rounded-2xl font-black text-lg uppercase tracking-tight hover:scale-105 transition-all flex items-center gap-2"
               >
                 Start Advertising <ChevronRight className="w-5 h-5" />
@@ -185,7 +179,6 @@ export default function LandingPage({ onLogin }: { onLogin: (role: 'advertiser' 
           </div>
           <p className="text-zinc-500 text-sm">© 2026 DanfoDrive. Built for the streets of Lagos.</p>
           <div className="flex gap-6 text-sm font-medium text-zinc-400">
-            <a href="/setup-admin" className="hover:text-brand-yellow transition-colors">Admin Setup</a>
             <a href="#" className="hover:text-white transition-colors">Twitter</a>
             <a href="#" className="hover:text-white transition-colors">LinkedIn</a>
             <a href="#" className="hover:text-white transition-colors">Instagram</a>

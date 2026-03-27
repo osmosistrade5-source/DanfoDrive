@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { 
   ShieldCheck, 
   Monitor, 
@@ -28,26 +29,108 @@ import {
 export default function AdminPanel({ user }: { user: any }) {
   const [devices, setDevices] = useState<any[]>([]);
   const [campaigns, setCampaigns] = useState<any[]>([]);
+  const [stats, setStats] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  
+  const location = useLocation();
+  const navigate = useNavigate();
+  
+  // Determine active tab from URL
+  const activeTab = location.pathname.includes('/admin/campaigns') ? 'campaigns' : 'devices';
 
   useEffect(() => {
-    const fetchData = async () => {
+    const verifySession = async () => {
+      const token = localStorage.getItem('danfo_token');
+      if (!token) {
+        navigate('/admin/login');
+        return;
+      }
+
       try {
-        const token = localStorage.getItem('danfo_token');
-        const [devRes, campRes] = await Promise.all([
-          fetch('/api/devices', { headers: { Authorization: `Bearer ${token}` } }),
-          fetch('/api/campaigns', { headers: { Authorization: `Bearer ${token}` } })
-        ]);
-        setDevices(await devRes.json());
-        setCampaigns(await campRes.json());
+        const response = await fetch('/api/admin/me', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        if (!response.ok) {
+          localStorage.removeItem('danfo_token');
+          localStorage.removeItem('danfo_user');
+          navigate('/admin/login');
+          return;
+        }
+        
+        // If session is valid, fetch data
+        fetchData();
       } catch (err) {
-        console.error(err);
-      } finally {
-        setIsLoading(false);
+        console.error('Session verification error:', err);
+        navigate('/admin/login');
       }
     };
-    fetchData();
-  }, []);
+
+    verifySession();
+  }, [navigate]);
+
+  const fetchData = async () => {
+    try {
+      const token = localStorage.getItem('danfo_token');
+      if (!token) return;
+
+      const [devRes, campRes, statRes] = await Promise.all([
+        fetch('/api/devices', { headers: { Authorization: `Bearer ${token}` } }),
+        fetch('/api/campaigns', { headers: { Authorization: `Bearer ${token}` } }),
+        fetch('/api/stats/admin', { headers: { Authorization: `Bearer ${token}` } })
+      ]);
+
+      if (devRes.ok) setDevices(await devRes.json());
+      if (campRes.ok) setCampaigns(await campRes.json());
+      if (statRes.ok) setStats(await statRes.json());
+    } catch (err) {
+      console.error('Fetch error:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleUpdateCampaignStatus = async (id: string, status: string) => {
+    try {
+      const token = localStorage.getItem('danfo_token');
+      const response = await fetch(`/api/admin/campaigns/${id}/status`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}` 
+        },
+        body: JSON.stringify({ status })
+      });
+      if (response.ok) {
+        fetchData();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const [isAddingDevice, setIsAddingDevice] = useState(false);
+  const [newDeviceType, setNewDeviceType] = useState('Danfo');
+
+  const handleAddDevice = async () => {
+    try {
+      const token = localStorage.getItem('danfo_token');
+      const response = await fetch('/api/devices', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}` 
+        },
+        body: JSON.stringify({ vehicle_type: newDeviceType, driver_id: '2' }) // Mock driver for now
+      });
+      if (response.ok) {
+        setIsAddingDevice(false);
+        fetchData();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   if (user?.role !== 'admin') {
     return (
@@ -75,78 +158,203 @@ export default function AdminPanel({ user }: { user: any }) {
           <button className="bg-white/5 border border-white/10 px-6 py-3 rounded-2xl font-bold hover:bg-white/10 transition-all flex items-center gap-2">
             <Activity className="w-5 h-5 text-brand-yellow" /> System Health: 99.9%
           </button>
-          <button className="bg-brand-yellow text-brand-black px-6 py-3 rounded-2xl font-black uppercase tracking-tight hover:scale-105 transition-all flex items-center gap-2">
+          <button 
+            onClick={() => setIsAddingDevice(true)}
+            className="bg-brand-yellow text-brand-black px-6 py-3 rounded-2xl font-black uppercase tracking-tight hover:scale-105 transition-all flex items-center gap-2"
+          >
             <Plus className="w-5 h-5" /> Add Device
           </button>
         </div>
       </div>
 
+      {/* Add Device Modal */}
+      <AnimatePresence>
+        {isAddingDevice && (
+          <div className="fixed inset-0 z-[300] flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsAddingDevice(false)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-md bg-zinc-900 rounded-[32px] border border-white/10 p-8 shadow-2xl"
+            >
+              <h3 className="text-2xl font-black uppercase tracking-tighter mb-6">Register New Device</h3>
+              <div className="space-y-6">
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2 block">Vehicle Type</label>
+                  <select 
+                    value={newDeviceType}
+                    onChange={(e) => setNewDeviceType(e.target.value)}
+                    className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-brand-yellow transition-all"
+                  >
+                    <option value="Danfo">Danfo</option>
+                    <option value="BRT">BRT</option>
+                    <option value="Taxi">Taxi</option>
+                  </select>
+                </div>
+                <div className="flex gap-4">
+                  <button 
+                    onClick={() => setIsAddingDevice(false)}
+                    className="flex-1 py-4 rounded-xl font-bold text-zinc-500 hover:bg-white/5 transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={handleAddDevice}
+                    className="flex-1 bg-brand-yellow text-brand-black py-4 rounded-xl font-black uppercase tracking-tight hover:scale-[1.02] transition-all"
+                  >
+                    Register
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <AdminStatCard icon={Monitor} label="Total Screens" value={devices.length} trend="+4" />
-        <AdminStatCard icon={TrendingUp} label="Total Ad Spend" value="₦4.2M" trend="+12%" />
-        <AdminStatCard icon={Users} label="Total Drivers" value="128" trend="+8" />
-        <AdminStatCard icon={Zap} label="Impressions" value="1.2M" trend="+24%" />
+        <AdminStatCard icon={Monitor} label="Total Screens" value={stats?.onlineDevices || 0} trend="+4" />
+        <AdminStatCard icon={TrendingUp} label="Total Ad Spend" value={`₦${(stats?.totalSpend || 0).toLocaleString()}`} trend="+12%" />
+        <AdminStatCard icon={Users} label="Total Drivers" value={stats?.totalDrivers || 0} trend="+8" />
+        <AdminStatCard icon={Zap} label="Impressions" value={(stats?.totalImpressions || 0).toLocaleString()} trend="+24%" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Device Management */}
+        {/* Main Management Area */}
         <div className="lg:col-span-2 glass-card overflow-hidden">
           <div className="p-8 border-b border-white/5 flex items-center justify-between">
-            <h3 className="text-xl font-black uppercase tracking-tight">Device Management</h3>
+            <div className="flex gap-8">
+              <button 
+                onClick={() => navigate('/admin/devices')}
+                className={`text-xl font-black uppercase tracking-tight transition-all ${activeTab === 'devices' ? 'text-brand-yellow' : 'text-zinc-500'}`}
+              >
+                Devices
+              </button>
+              <button 
+                onClick={() => navigate('/admin/campaigns')}
+                className={`text-xl font-black uppercase tracking-tight transition-all ${activeTab === 'campaigns' ? 'text-brand-yellow' : 'text-zinc-500'}`}
+              >
+                Campaigns
+              </button>
+            </div>
             <div className="flex gap-4">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
                 <input 
                   type="text" 
-                  placeholder="Search devices..." 
+                  placeholder={`Search ${activeTab}...`} 
                   className="bg-black border border-white/10 rounded-xl pl-10 pr-4 py-2 text-sm outline-none focus:border-brand-yellow transition-all"
                 />
               </div>
             </div>
           </div>
+          
           <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="bg-white/5 text-[10px] font-black uppercase tracking-widest text-zinc-500">
-                  <th className="px-8 py-4">Device ID</th>
-                  <th className="px-8 py-4">Status</th>
-                  <th className="px-8 py-4">Driver</th>
-                  <th className="px-8 py-4">Last Ping</th>
-                  <th className="px-8 py-4">Uptime</th>
-                  <th className="px-8 py-4"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {devices.map((device) => (
-                  <tr key={device.id} className="hover:bg-white/5 transition-all group">
-                    <td className="px-8 py-6">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-brand-yellow/10 flex items-center justify-center text-brand-yellow">
-                          <Smartphone className="w-5 h-5" />
-                        </div>
-                        <p className="font-bold uppercase tracking-tight">#{device.id}</p>
-                      </div>
-                    </td>
-                    <td className="px-8 py-6">
-                      <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
-                        device.status === 'online' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'
-                      }`}>
-                        {device.status}
-                      </span>
-                    </td>
-                    <td className="px-8 py-6 text-zinc-400">Emeka Nwosu</td>
-                    <td className="px-8 py-6 text-zinc-400 text-xs">2m ago</td>
-                    <td className="px-8 py-6 font-bold">98.4%</td>
-                    <td className="px-8 py-6 text-right">
-                      <button className="p-2 hover:bg-white/10 rounded-lg text-zinc-500 hover:text-white transition-all">
-                        <MoreVertical className="w-5 h-5" />
-                      </button>
-                    </td>
+            {activeTab === 'devices' ? (
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-white/5 text-[10px] font-black uppercase tracking-widest text-zinc-500">
+                    <th className="px-8 py-4">Device ID</th>
+                    <th className="px-8 py-4">Status</th>
+                    <th className="px-8 py-4">Vehicle</th>
+                    <th className="px-8 py-4">Last Ping</th>
+                    <th className="px-8 py-4">Uptime</th>
+                    <th className="px-8 py-4"></th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {devices.map((device) => (
+                    <tr key={device.id} className="hover:bg-white/5 transition-all group">
+                      <td className="px-8 py-6">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-brand-yellow/10 flex items-center justify-center text-brand-yellow">
+                            <Smartphone className="w-5 h-5" />
+                          </div>
+                          <p className="font-bold uppercase tracking-tight">#{device.id}</p>
+                        </div>
+                      </td>
+                      <td className="px-8 py-6">
+                        <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                          device.status === 'online' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'
+                        }`}>
+                          {device.status}
+                        </span>
+                      </td>
+                      <td className="px-8 py-6 text-zinc-400">{device.vehicle_type}</td>
+                      <td className="px-8 py-6 text-zinc-400 text-xs">
+                        {new Date(device.last_heartbeat).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </td>
+                      <td className="px-8 py-6 font-bold">98.4%</td>
+                      <td className="px-8 py-6 text-right">
+                        <button className="p-2 hover:bg-white/10 rounded-lg text-zinc-500 hover:text-white transition-all">
+                          <MoreVertical className="w-5 h-5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-white/5 text-[10px] font-black uppercase tracking-widest text-zinc-500">
+                    <th className="px-8 py-4">Campaign Name</th>
+                    <th className="px-8 py-4">Budget</th>
+                    <th className="px-8 py-4">Status</th>
+                    <th className="px-8 py-4">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {campaigns.map((campaign) => (
+                    <tr key={campaign.id} className="hover:bg-white/5 transition-all group">
+                      <td className="px-8 py-6">
+                        <p className="font-bold uppercase tracking-tight">{campaign.name}</p>
+                        <p className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">ID: {campaign.id}</p>
+                      </td>
+                      <td className="px-8 py-6 font-bold">₦{campaign.budget.toLocaleString()}</td>
+                      <td className="px-8 py-6">
+                        <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                          campaign.status === 'active' ? 'bg-green-500/10 text-green-500' : 
+                          campaign.status === 'paused' ? 'bg-yellow-500/10 text-yellow-500' : 
+                          'bg-zinc-500/10 text-zinc-500'
+                        }`}>
+                          {campaign.status}
+                        </span>
+                      </td>
+                      <td className="px-8 py-6">
+                        <div className="flex gap-2">
+                          {campaign.status !== 'active' && (
+                            <button 
+                              onClick={() => handleUpdateCampaignStatus(campaign.id, 'active')}
+                              className="p-2 bg-green-500/10 text-green-500 rounded-lg hover:bg-green-500/20 transition-all"
+                              title="Approve"
+                            >
+                              <CheckCircle2 className="w-4 h-4" />
+                            </button>
+                          )}
+                          {campaign.status === 'active' && (
+                            <button 
+                              onClick={() => handleUpdateCampaignStatus(campaign.id, 'paused')}
+                              className="p-2 bg-yellow-500/10 text-yellow-500 rounded-lg hover:bg-yellow-500/20 transition-all"
+                              title="Pause"
+                            >
+                              <XCircle className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
 

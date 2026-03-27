@@ -256,12 +256,6 @@ export default function App() {
               >
                 Driver Auth
               </button>
-              <button 
-                onClick={() => navigate('/admin/login')}
-                className="p-2 rounded-lg text-[10px] font-black uppercase tracking-tighter text-zinc-500 hover:text-white"
-              >
-                Admin Login
-              </button>
             </>
           ) : (
             <button 

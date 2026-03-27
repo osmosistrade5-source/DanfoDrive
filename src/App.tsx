@@ -30,8 +30,8 @@ import DriverPortal from './components/DriverPortal';
 import AdPlayer from './components/AdPlayer';
 import AdminPanel from './components/AdminPanel';
 import AdminLogin from './components/AdminLogin';
-import AdvertiserLogin from './components/AdvertiserLogin';
-import AdvertiserSignup from './components/AdvertiserSignup';
+import AdvertiserAuth from './components/AdvertiserAuth';
+import ProtectedRoute from './components/ProtectedRoute';
 import AuthModal from './components/AuthModal';
 import { MapSearch } from './components/MapSearch';
 
@@ -65,7 +65,7 @@ export default function App() {
     localStorage.removeItem('danfo_user');
     localStorage.removeItem('danfo_token');
     setUser(null);
-    navigate('/');
+    navigate('/advertiser/auth');
   };
 
   const handleAuth = async (credentials: any, mode: 'login' | 'signup') => {
@@ -200,9 +200,15 @@ export default function App() {
                 }} 
               />
             } />
-            <Route path="/advertiser/login" element={<AdvertiserLogin onLoginSuccess={setUser} />} />
-            <Route path="/advertiser/signup" element={<AdvertiserSignup onSignupSuccess={setUser} />} />
-            <Route path="/advertiser/*" element={<AdvertiserDashboard user={user} setUser={setUser} />} />
+            <Route path="/advertiser/auth" element={<AdvertiserAuth onAuthSuccess={setUser} />} />
+            <Route 
+              path="/advertiser/*" 
+              element={
+                <ProtectedRoute role="advertiser">
+                  <AdvertiserDashboard user={user} setUser={setUser} />
+                </ProtectedRoute>
+              } 
+            />
             <Route path="/advertiser/map-search" element={<MapSearch />} />
             <Route path="/driver/*" element={<DriverPortal user={user} />} />
             <Route path="/admin/login" element={<AdminLogin onLoginSuccess={setUser} />} />
@@ -230,10 +236,10 @@ export default function App() {
           {!user ? (
             <>
               <button 
-                onClick={() => handleAuth({ email: 'advertiser@danfodrive.com', password: 'password' }, 'login')}
+                onClick={() => navigate('/advertiser/auth')}
                 className="p-2 rounded-lg text-[10px] font-black uppercase tracking-tighter text-zinc-500 hover:text-white"
               >
-                Login Ads
+                Advertiser Auth
               </button>
               <button 
                 onClick={() => handleAuth({ email: 'driver@danfodrive.com', password: 'password' }, 'login')}

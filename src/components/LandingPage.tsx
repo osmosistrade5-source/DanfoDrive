@@ -33,13 +33,13 @@ export default function LandingPage({ onLogin }: { onLogin: (role: 'advertiser' 
             <a href="#how-it-works" className="hover:text-white transition-colors">How it Works</a>
             <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
             <button 
-              onClick={() => navigate('/advertiser/login')}
+              onClick={() => navigate('/advertiser/auth')}
               className="hover:text-white transition-colors"
             >
               Login
             </button>
             <button 
-              onClick={() => navigate('/advertiser/signup')}
+              onClick={() => navigate('/advertiser/auth')}
               className="bg-brand-yellow text-brand-black px-6 py-2.5 rounded-full font-bold hover:scale-105 transition-all"
             >
               Launch Campaign
@@ -68,7 +68,7 @@ export default function LandingPage({ onLogin }: { onLogin: (role: 'advertiser' 
             </p>
             <div className="flex flex-wrap gap-4">
               <button 
-                onClick={() => navigate('/advertiser/signup')}
+                onClick={() => navigate('/advertiser/auth')}
                 className="bg-brand-yellow text-brand-black px-8 py-4 rounded-2xl font-black text-lg uppercase tracking-tight hover:scale-105 transition-all flex items-center gap-2"
               >
                 Start Advertising <ChevronRight className="w-5 h-5" />

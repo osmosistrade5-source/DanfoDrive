@@ -74,7 +74,7 @@ export default function LandingPage({ onLogin }: { onLogin: (role: 'advertiser' 
                 Start Advertising <ChevronRight className="w-5 h-5" />
               </button>
               <button 
-                onClick={() => onLogin('driver')}
+                onClick={() => navigate('/driver/auth')}
                 className="bg-zinc-900 border border-white/10 text-white px-8 py-4 rounded-2xl font-black text-lg uppercase tracking-tight hover:bg-zinc-800 transition-all"
               >
                 Become a Driver

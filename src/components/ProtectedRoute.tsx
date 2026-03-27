@@ -34,7 +34,11 @@ export default function ProtectedRoute({ children, role }: ProtectedRouteProps) 
         }
 
         // Verify with backend
-        const endpoint = user.role === 'admin' ? '/api/admin/me' : '/api/advertisers/me';
+        let endpoint = '/api/auth/me'; // Default
+        if (user.role === 'admin') endpoint = '/api/admin/me';
+        else if (user.role === 'advertiser') endpoint = '/api/advertisers/me';
+        else if (user.role === 'driver') endpoint = '/api/drivers/me';
+
         const response = await fetch(endpoint, {
           headers: { Authorization: `Bearer ${token}` }
         });

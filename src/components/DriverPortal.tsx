@@ -47,6 +47,28 @@ export default function DriverPortal({ user }: { user: any }) {
         </button>
       </div>
 
+      {/* Verification Warning */}
+      {!user?.is_verified && (
+        <motion.div 
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-6 rounded-3xl bg-brand-yellow/10 border border-brand-yellow/20 flex flex-col md:flex-row items-center justify-between gap-6"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-brand-yellow/20 rounded-2xl flex items-center justify-center shrink-0">
+              <AlertCircle className="w-6 h-6 text-brand-yellow" />
+            </div>
+            <div>
+              <p className="font-black uppercase tracking-tight text-brand-yellow">Verification Pending</p>
+              <p className="text-sm text-zinc-400 font-medium">Your account is currently under review. Some features like withdrawals and new screen activations are restricted until your license is verified.</p>
+            </div>
+          </div>
+          <button className="whitespace-nowrap px-6 py-3 bg-brand-yellow text-brand-black rounded-xl font-black uppercase tracking-widest text-xs hover:scale-105 transition-all">
+            Check Status
+          </button>
+        </motion.div>
+      )}
+
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="glass-card p-8 bg-gradient-to-br from-brand-yellow/10 to-transparent border-brand-yellow/20">

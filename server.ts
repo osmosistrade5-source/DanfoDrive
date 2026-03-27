@@ -22,7 +22,7 @@ app.get('/api/health', (req, res) => {
 // --- Mock Database (for demo if Supabase not set up) ---
 let users: any[] = [
   { id: '1', email: 'advertiser@danfodrive.com', password: '', role: 'advertiser', full_name: 'Tunde Okafor', company_name: 'Tunde Ads', wallet_balance: 50000 },
-  { id: '2', email: 'driver@danfodrive.com', password: '', role: 'driver', full_name: 'Emeka Nwosu', wallet_balance: 12000 },
+  { id: '2', email: 'driver@danfodrive.com', password: '', role: 'driver', full_name: 'Emeka Nwosu', phone_number: '08012345678', vehicle_type: 'Danfo', license_number: 'LAG-12345', is_verified: true, wallet_balance: 12000 },
   { id: '3', email: 'osmosistrade5@gmail.com', password: '', role: 'admin', full_name: 'Michael Dinho', wallet_balance: 0 },
 ];
 
@@ -104,6 +104,101 @@ app.post('/api/auth/login', async (req, res) => {
 
   const token = jwt.sign({ id: user.id, role: user.role, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
   res.json({ token, user: { id: user.id, email: user.email, role: user.role, full_name: user.full_name, company_name: user.company_name, wallet_balance: user.wallet_balance } });
+});
+
+// Driver Auth
+app.post('/api/drivers/register', async (req, res) => {
+  const { email, password, full_name, phone_number, vehicle_type, license_number } = req.body;
+  
+  if (users.find(u => u.email === email)) {
+    return res.status(400).json({ error: 'Email already registered' });
+  }
+
+  if (password.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  }
+
+  const salt = await bcrypt.genSalt(10);
+  const hashedPassword = await bcrypt.hash(password, salt);
+
+  const newUser = {
+    id: `d${Date.now()}`,
+    email,
+    password: hashedPassword,
+    role: 'driver',
+    full_name,
+    phone_number,
+    vehicle_type,
+    license_number,
+    is_verified: false,
+    wallet_balance: 0,
+    created_at: new Date().toISOString()
+  };
+
+  users.push(newUser);
+
+  const token = jwt.sign({ id: newUser.id, role: newUser.role, email: newUser.email }, JWT_SECRET, { expiresIn: '7d' });
+  res.json({ 
+    token, 
+    user: { 
+      id: newUser.id, 
+      email: newUser.email, 
+      role: newUser.role, 
+      full_name: newUser.full_name, 
+      phone_number: newUser.phone_number,
+      vehicle_type: newUser.vehicle_type,
+      license_number: newUser.license_number,
+      is_verified: newUser.is_verified,
+      wallet_balance: newUser.wallet_balance 
+    } 
+  });
+});
+
+app.post('/api/drivers/login', async (req, res) => {
+  const { email, password } = req.body;
+  const user = users.find(u => u.email === email && u.role === 'driver');
+  
+  if (!user) {
+    return res.status(401).json({ error: 'Invalid driver credentials' });
+  }
+
+  const isMatch = await bcrypt.compare(password, user.password);
+  if (!isMatch) {
+    return res.status(401).json({ error: 'Invalid driver credentials' });
+  }
+
+  const token = jwt.sign({ id: user.id, role: user.role, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+  res.json({ 
+    token, 
+    user: { 
+      id: user.id, 
+      email: user.email, 
+      role: user.role, 
+      full_name: user.full_name, 
+      phone_number: user.phone_number,
+      vehicle_type: user.vehicle_type,
+      license_number: user.license_number,
+      is_verified: user.is_verified,
+      wallet_balance: user.wallet_balance 
+    } 
+  });
+});
+
+app.get('/api/drivers/me', authenticate, (req: any, res) => {
+  if (req.user.role !== 'driver') return res.status(403).json({ error: 'Forbidden' });
+  const user = users.find(u => u.id === req.user.id);
+  if (!user) return res.status(404).json({ error: 'Driver not found' });
+  res.json({ 
+    id: user.id, 
+    email: user.email, 
+    role: user.role, 
+    full_name: user.full_name, 
+    phone_number: user.phone_number,
+    vehicle_type: user.vehicle_type,
+    license_number: user.license_number,
+    is_verified: user.is_verified,
+    wallet_balance: user.wallet_balance 
+  });
 });
 
 // Advertiser Auth

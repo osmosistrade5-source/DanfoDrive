@@ -31,6 +31,7 @@ import AdPlayer from './components/AdPlayer';
 import AdminPanel from './components/AdminPanel';
 import AdminLogin from './components/AdminLogin';
 import AdvertiserAuth from './components/AdvertiserAuth';
+import DriverAuth from './components/DriverAuth';
 import ProtectedRoute from './components/ProtectedRoute';
 import AuthModal from './components/AuthModal';
 import { MapSearch } from './components/MapSearch';
@@ -210,7 +211,15 @@ export default function App() {
               } 
             />
             <Route path="/advertiser/map-search" element={<MapSearch />} />
-            <Route path="/driver/*" element={<DriverPortal user={user} />} />
+            <Route path="/driver/auth" element={<DriverAuth onAuthSuccess={setUser} />} />
+            <Route 
+              path="/driver/*" 
+              element={
+                <ProtectedRoute role="driver">
+                  <DriverPortal user={user} />
+                </ProtectedRoute>
+              } 
+            />
             <Route path="/admin/login" element={<AdminLogin onLoginSuccess={setUser} />} />
             <Route path="/admin/*" element={<AdminPanel user={user} />} />
             <Route path="/player" element={<AdPlayer />} />
@@ -242,10 +251,10 @@ export default function App() {
                 Advertiser Auth
               </button>
               <button 
-                onClick={() => handleAuth({ email: 'driver@danfodrive.com', password: 'password' }, 'login')}
+                onClick={() => navigate('/driver/auth')}
                 className="p-2 rounded-lg text-[10px] font-black uppercase tracking-tighter text-zinc-500 hover:text-white"
               >
-                Login Driver
+                Driver Auth
               </button>
               <button 
                 onClick={() => navigate('/admin/login')}
